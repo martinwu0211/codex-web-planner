@@ -23,6 +23,13 @@ The first setup builds the local bridge and opens the one-time ChatGPT authoriza
 
 From this directory, run `./scripts/setup.sh`. The script installs dependencies and builds the bridge in `engine/`. It does not create credentials or send workspace data anywhere.
 
+## Measuring context usage
+
+The bridge keeps a local, content-free aggregate at the platform state directory under
+`metrics/token-usage.json`. It records request/response character counts and a rough token estimate
+(characters divided by four); it never stores MCP content, credentials, or workspace paths. Use the
+file to compare the compact control-message workflow with a baseline task run.
+
 ## License
 
 MIT. See `LICENSE` and `THIRD_PARTY_NOTICES.md`.
