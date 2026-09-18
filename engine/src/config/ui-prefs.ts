@@ -24,12 +24,14 @@ export const SETUP_CHOICE_PROMPT = [
 
 interface StoredUiPrefs {
   developerModeEnabled?: boolean;
+  tokenMetricsEnabled?: boolean;
   setupMode?: SetupMode;
   updatedAt: string;
 }
 
 export interface UiPrefsView {
   developerModeEnabled: boolean;
+  tokenMetricsEnabled: boolean;
   setupMode: SetupMode | null;
   setupChoicePrompt: string;
   remembered: {
@@ -48,6 +50,7 @@ function readStored(): StoredUiPrefs | null {
   const setupMode = raw.setupMode === "auto" || raw.setupMode === "manual" ? raw.setupMode : undefined;
   return {
     developerModeEnabled: raw.developerModeEnabled === true,
+    tokenMetricsEnabled: raw.tokenMetricsEnabled !== false,
     setupMode,
     updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : new Date().toISOString(),
   };
@@ -59,6 +62,7 @@ export function readUiPrefs(): UiPrefsView {
   const setupMode = stored?.setupMode ?? null;
   return {
     developerModeEnabled,
+    tokenMetricsEnabled: stored?.tokenMetricsEnabled !== false,
     setupMode,
     setupChoicePrompt: SETUP_CHOICE_PROMPT,
     remembered: {
@@ -70,6 +74,7 @@ export function readUiPrefs(): UiPrefsView {
 
 export interface UiPrefsPatch {
   developerModeEnabled?: true;
+  tokenMetricsEnabled?: boolean;
   setupMode?: SetupMode;
 }
 
@@ -87,6 +92,8 @@ export function mergeUiPrefs(patch: UiPrefsPatch): UiPrefsView {
   if (patch.developerModeEnabled === true || previous?.developerModeEnabled === true) {
     stored.developerModeEnabled = true;
   }
+  if (patch.tokenMetricsEnabled !== undefined) stored.tokenMetricsEnabled = patch.tokenMetricsEnabled;
+  else if (previous?.tokenMetricsEnabled !== undefined) stored.tokenMetricsEnabled = previous.tokenMetricsEnabled;
   if (setupMode) stored.setupMode = setupMode;
   writeSecureJson(prefsFile(), stored);
   return readUiPrefs();

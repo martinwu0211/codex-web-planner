@@ -56,6 +56,7 @@ import {
 } from "../session/state.js";
 import { appendExecutionRecord } from "../execution/records.js";
 import { saveExecutionOutput } from "../execution/output.js";
+import { readTokenUsage } from "../metrics/token-counter.js";
 
 const program = new Command();
 
@@ -403,8 +404,10 @@ program
     }
     const runtime = observation.runtime;
     const info = await adminFetch<AdminInfo>(runtime, "GET", "/admin/info");
+    const usage = readTokenUsage();
+    const tokenMetrics = { enabled: readUiPrefs().tokenMetricsEnabled, ...usage };
     if (opts.json) {
-      say(JSON.stringify({ ok: true, running: true, ...info }));
+      say(JSON.stringify({ ok: true, running: true, ...info, tokenMetrics }));
       return;
     }
     say(PRODUCT_NAME);
@@ -414,6 +417,22 @@ program
     if (info.tunnel.running && info.tunnel.url) check(`安全连接：${info.tunnel.url}/mcp`);
     else say("· 安全连接：未启用（本地模式）");
     say(`· 已授权连接：${info.tokenCount > 0 ? "是" : "否"}`);
+    if (tokenMetrics.enabled) {
+      say(`· MCP 计数：${usage.requests} 次，估算 ${usage.estimatedInputTokens + usage.estimatedOutputTokens} tokens`);
+    } else say("· MCP 计数：已关闭");
+  });
+
+program
+  .command("usage")
+  .description("Show local MCP token usage metrics")
+  .option("--json", "machine-readable output", false)
+  .action((opts: { json: boolean }) => {
+    const usage = readTokenUsage();
+    const enabled = readUiPrefs().tokenMetricsEnabled;
+    if (opts.json) { say(JSON.stringify({ ok: true, enabled, ...usage })); return; }
+    say(enabled ? `MCP 计数：${usage.requests} 次` : "MCP 计数：已关闭");
+    say(`输入：${usage.inputChars} 字符，输出：${usage.outputChars} 字符`);
+    say(`估算 token：输入 ${usage.estimatedInputTokens}，输出 ${usage.estimatedOutputTokens}`);
   });
 
 // ---------------------------------------------------------------- doctor
@@ -1019,6 +1038,7 @@ acceptUnusedWorkspaceOption(
     if (prefs.setupMode === "auto") say("配置方式：AI 自动化配置（预览版）");
     else if (prefs.setupMode === "manual") say("配置方式：手动教学配置");
     else say("配置方式：尚未选择");
+    say(`MCP 计数：${prefs.tokenMetricsEnabled ? "已开启" : "已关闭"}`);
   });
 
 acceptUnusedWorkspaceOption(
@@ -1027,20 +1047,24 @@ acceptUnusedWorkspaceOption(
     .description("Save a ChatGPT setup choice for this machine")
     .option("--developer-mode", "remember that ChatGPT developer mode is on", false)
     .option("--setup-mode <mode>", "auto (preview) or manual")
+    .option("--token-metrics <state>", "on or off")
     .option("--json", "machine-readable output", false)
 )
-  .action((opts: { developerMode: boolean; setupMode?: string; json: boolean }) => {
+  .action((opts: { developerMode: boolean; setupMode?: string; tokenMetrics?: string; json: boolean }) => {
     try {
       const modeRaw = opts.setupMode?.trim().toLowerCase();
       if (modeRaw && !SETUP_MODES.includes(modeRaw as SetupMode)) {
         throw new Error(`setup-mode must be one of ${SETUP_MODES.join(", ")}`);
       }
-      if (!opts.developerMode && !modeRaw) {
-        throw new Error("nothing to save: pass --developer-mode and/or --setup-mode");
+      const metricsRaw = opts.tokenMetrics?.trim().toLowerCase();
+      if (metricsRaw && metricsRaw !== "on" && metricsRaw !== "off") throw new Error("token-metrics must be on or off");
+      if (!opts.developerMode && !modeRaw && !metricsRaw) {
+        throw new Error("nothing to save: pass --developer-mode, --setup-mode, and/or --token-metrics");
       }
       const prefs = mergeUiPrefs({
         developerModeEnabled: opts.developerMode ? true : undefined,
         setupMode: modeRaw as SetupMode | undefined,
+        tokenMetricsEnabled: metricsRaw ? metricsRaw === "on" : undefined,
       });
       if (opts.json) {
         say(JSON.stringify({ ok: true, ...prefs }));
@@ -1049,6 +1073,7 @@ acceptUnusedWorkspaceOption(
       if (opts.developerMode) check("已记住开发人员模式已开启");
       if (modeRaw === "auto") check("已记住配置方式：AI 自动化配置（预览版）");
       if (modeRaw === "manual") check("已记住配置方式：手动教学配置");
+      if (metricsRaw) check(`MCP 计数：${metricsRaw === "on" ? "已开启" : "已关闭"}`);
     } catch (error) {
       handleCliError(error, opts.json);
     }

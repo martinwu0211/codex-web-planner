@@ -28,7 +28,9 @@ From this directory, run `./scripts/setup.sh`. The script installs dependencies 
 The bridge keeps a local, content-free aggregate at the platform state directory under
 `metrics/token-usage.json`. It records request/response character counts and a rough token estimate
 (characters divided by four); it never stores MCP content, credentials, or workspace paths. Use the
-file to compare the compact control-message workflow with a baseline task run.
+file to compare the compact control-message workflow with a baseline task run. The CLI also shows
+the current total under `c2c status`; use `c2c usage` for the full breakdown. To disable or restore
+new measurements, run `c2c prefs set --token-metrics off` or `c2c prefs set --token-metrics on`.
 
 ## License
 

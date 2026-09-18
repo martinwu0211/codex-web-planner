@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { ensureDir, getStateDir } from "../config/paths.js";
+import { readUiPrefs } from "../config/ui-prefs.js";
 
 export interface TokenUsageSnapshot {
   schemaVersion: 1;
@@ -20,6 +21,7 @@ export function estimateTokens(chars: number): number {
 }
 
 export function recordMcpExchange(inputChars: number, outputChars: number): void {
+  if (!readUiPrefs().tokenMetricsEnabled) return;
   try {
     const file = usageFile();
     let current: Partial<TokenUsageSnapshot> = {};

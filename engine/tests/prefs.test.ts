@@ -22,6 +22,7 @@ describe("ui prefs", () => {
     dirs.push(isolateStateDir());
     const prefs = readUiPrefs();
     expect(prefs.developerModeEnabled).toBe(false);
+    expect(prefs.tokenMetricsEnabled).toBe(true);
     expect(prefs.setupMode).toBeNull();
     expect(prefs.remembered).toEqual({ developerMode: false, setupMode: false });
     expect(prefs.setupChoicePrompt).toBe(SETUP_CHOICE_PROMPT);
@@ -48,6 +49,14 @@ describe("ui prefs", () => {
     const auto = mergeUiPrefs({ setupMode: "auto" });
     expect(auto.setupMode).toBe("auto");
     expect(auto.developerModeEnabled).toBe(true);
+  });
+
+  it("can disable and restore token metrics", () => {
+    dirs.push(isolateStateDir());
+    expect(mergeUiPrefs({ tokenMetricsEnabled: false }).tokenMetricsEnabled).toBe(false);
+    expect(readUiPrefs().tokenMetricsEnabled).toBe(false);
+    expect(mergeUiPrefs({ setupMode: "manual" }).tokenMetricsEnabled).toBe(false);
+    expect(mergeUiPrefs({ tokenMetricsEnabled: true }).tokenMetricsEnabled).toBe(true);
   });
 
   it("rejects an unknown setup mode", () => {
