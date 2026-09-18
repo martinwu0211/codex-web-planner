@@ -179,12 +179,12 @@ describe("workspace identity", () => {
       named,
       ".c2c.json",
       JSON.stringify({
-        name: "Remi",
+        name: "Example Workspace",
         maxIterations: 12,
       })
     );
     const namedWs = new Workspace(named);
-    expect(namedWs.name).toBe("Remi");
+    expect(namedWs.name).toBe("Example Workspace");
     expect(namedWs.projectConfig.maxIterations).toBe(12);
     cleanup(named);
   });

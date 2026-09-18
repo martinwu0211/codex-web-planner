@@ -242,11 +242,11 @@ describe("tunnel transport protocol", () => {
 
 describe("normalizeNamedTunnelHostname", () => {
   it("normalizes a valid hostname", () => {
-    expect(normalizeNamedTunnelHostname("Dev.GetRemi.xyz.")).toBe("dev.getremi.xyz");
+    expect(normalizeNamedTunnelHostname("Dev.Example.test.")).toBe("dev.example.test");
   });
 
   it("rejects URLs and invalid hostnames", () => {
-    expect(() => normalizeNamedTunnelHostname("https://dev.getremi.xyz")).toThrow(/invalid/i);
+    expect(() => normalizeNamedTunnelHostname("https://dev.example.test")).toThrow(/invalid/i);
     expect(() => normalizeNamedTunnelHostname("localhost")).toThrow(/invalid/i);
   });
 });
