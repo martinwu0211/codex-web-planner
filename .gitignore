@@ -1,0 +1,12 @@
+engine/node_modules/
+engine/dist/
+engine/.tooling/
+engine/.pnpm-store/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+.secret
+__pycache__/
+coverage/
