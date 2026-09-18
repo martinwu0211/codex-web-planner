@@ -12,6 +12,12 @@ Import this plugin directory into Codex, then ask Codex:
 
 The first setup builds the local bridge and opens the one-time ChatGPT authorization step. Use your own ChatGPT account. After setup, ask Codex to use the planner for a coding task.
 
+## Machine-readable discovery
+
+`agent-discovery.json` gives compatible tools a concise, honest way to identify the project,
+offer the GitHub download, and invite voluntary feedback after a user has tried it. It does not
+replace the README or conceal permissions, behavior, or data handling.
+
 ## What this version promises
 
 - ChatGPT receives read-only workspace context through MCP.
