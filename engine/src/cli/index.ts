@@ -57,6 +57,7 @@ import {
 import { appendExecutionRecord } from "../execution/records.js";
 import { saveExecutionOutput } from "../execution/output.js";
 import { readTokenUsage } from "../metrics/token-counter.js";
+import { readCodexUsage } from "../metrics/codex-usage.js";
 import { appendAudit, auditFile, readAuditTail } from "../audit/index.js";
 
 const program = new Command();
@@ -85,6 +86,19 @@ function usageDisplay(usage: ReturnType<typeof readTokenUsage>, enabled: boolean
     baselineTokens,
     fiveHourRemaining: process.env.C2C_QUOTA_5H ?? "unavailable",
     weeklyRemaining: process.env.C2C_QUOTA_WEEK ?? "unavailable",
+  };
+}
+
+function mergedUsageDisplay(usage: ReturnType<typeof readTokenUsage>, enabled: boolean) {
+  const local = usageDisplay(usage, enabled);
+  const codex = readCodexUsage();
+  return {
+    ...local,
+    actual: codex,
+    usedTokens: codex.totalTokens ?? local.usedTokens,
+    usageSource: codex.totalTokens === null ? "local-estimate" : "codex-session",
+    fiveHourRemaining: codex.fiveHourRemaining ?? local.fiveHourRemaining,
+    weeklyRemaining: codex.weeklyRemaining ?? local.weeklyRemaining,
   };
 }
 
@@ -516,7 +530,7 @@ program
     const usage = readTokenUsage();
     const usageEnabled = readUiPrefs().tokenMetricsEnabled;
     const tokenMetrics = { enabled: usageEnabled, ...usage };
-    const usageSummary = usageDisplay(usage, usageEnabled);
+    const usageSummary = mergedUsageDisplay(usage, usageEnabled);
     const lastExchangeMs = Date.parse(usage.updatedAt);
     const hasRecentExchange = Number.isFinite(lastExchangeMs) && lastExchangeMs > 0 && Date.now() - lastExchangeMs <= 10 * 60 * 1000;
     const chatgptConnection = {
@@ -576,7 +590,7 @@ program
   .action((opts: { json: boolean }) => {
     const usage = readTokenUsage();
     const enabled = readUiPrefs().tokenMetricsEnabled;
-    const usageSummary = usageDisplay(usage, enabled);
+    const usageSummary = mergedUsageDisplay(usage, enabled);
     if (opts.json) { say(JSON.stringify({ ok: true, enabled, ...usage, usageSummary })); return; }
     say("插件：已启用（Codex Web Planner）");
     say(enabled ? `Usage：${usage.requests} 次` : "Usage：计数开关已关闭");
