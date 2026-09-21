@@ -363,6 +363,46 @@ program
     }
   });
 
+program
+  .command("wait-auth")
+  .description("Wait for ChatGPT to finish authorizing this workspace")
+  .option("-w, --workspace <path>")
+  .option("--timeout-seconds <seconds>", "maximum wait", "300")
+  .option("--interval-seconds <seconds>", "poll interval", "5")
+  .option("--json", "machine-readable output", false)
+  .action(async (opts: { workspace?: string; timeoutSeconds: string; intervalSeconds: string; json: boolean }) => {
+    const root = resolveWorkspace(opts.workspace);
+    const timeoutMs = Math.max(1, Number(opts.timeoutSeconds)) * 1000;
+    const intervalMs = Math.max(1, Number(opts.intervalSeconds)) * 1000;
+    const started = Date.now();
+    const workspace = new Workspace(root);
+    if (!opts.json) say("[4/5] 等待 ChatGPT 完成授权……");
+    while (Date.now() - started <= timeoutMs) {
+      const observation = await findBridgeObservation(workspace.id);
+      if (observation.state === "running") {
+        const info = await adminFetch<AdminInfo>(observation.runtime, "GET", "/admin/info");
+        if (info.tokenCount > 0) {
+          const result = { ok: true, authorized: true, workspaceId: workspace.id, elapsedSeconds: Math.round((Date.now() - started) / 1000) };
+          if (opts.json) say(JSON.stringify(result));
+          else {
+            check("[5/5] ChatGPT 已授权");
+            say("后续步骤可以自动继续。");
+          }
+          return;
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+    const result = { ok: false, authorized: false, code: "CHATGPT_AUTH_TIMEOUT", message: "等待授权超时；连接器尚未完成 ChatGPT 授权。", nextAction: "确认已在 ChatGPT 连接器设置中完成授权后，再运行 c2c wait-auth。" };
+    if (opts.json) say(JSON.stringify(result));
+    else {
+      cross(`错误码：${result.code}`);
+      say(result.message);
+      say(`处理：${result.nextAction}`);
+    }
+    process.exitCode = 1;
+  });
+
 // ---------------------------------------------------------------- stop / restart
 
 program
