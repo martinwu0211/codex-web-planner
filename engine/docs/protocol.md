@@ -63,7 +63,7 @@ GOAL:
 Implement dark mode.
 
 INSTRUCTION:
-Inspect the connected workspace through Codex with ChatGPT MCP.
+Inspect the connected workspace through Codex Web Planner MCP.
 Create an implementation plan for Codex.
 ```
 
@@ -213,7 +213,7 @@ Codex owns execution.
 You own high-level reasoning, planning and review.
 
 You have access to the current local workspace through the
-"Codex with ChatGPT" MCP connector.
+"Codex Web Planner" MCP connector.
 
 Rules:
 
@@ -258,7 +258,7 @@ This Project is bound only to:
 - Connector (use this one only): {{connector_name}}
 
 When you call tools, use ONLY that connector. Do not use any other
-Codex with ChatGPT connector. If workspace_info names a different
+Codex Web Planner connector. If workspace_info names a different
 workspace, stop. Do not plan. Do not use this Project's memory.
 
 Read code, git, diffs, and any released command output through that

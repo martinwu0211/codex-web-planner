@@ -19,8 +19,8 @@ describe("connectorAction", () => {
 
   it("updates when the old address was reclaimed", () => {
     expect(connectorAction("https://old.trycloudflare.com/mcp", "https://new.trycloudflare.com/mcp")).toBe("update");
-    expect(reclaimUserMessage("Codex with ChatGPT")).toContain("删除");
-    expect(reclaimUserMessage("Codex with ChatGPT")).not.toContain("Reconnect");
+    expect(reclaimUserMessage("Codex Web Planner")).toContain("删除");
+    expect(reclaimUserMessage("Codex Web Planner")).not.toContain("Reconnect");
   });
 
   it("does nothing without a next URL", () => {
@@ -34,7 +34,7 @@ describe("connectorNameFor", () => {
       connectorNameFor({
         workspaceName: "EchoMind",
         workspaceId: "abc123abc123",
-        previousName: "Codex with ChatGPT",
+        previousName: "Codex Web Planner",
         hadEndpointBefore: true,
       })
     ).toBe(DEFAULT_CONNECTOR_NAME);
@@ -57,7 +57,7 @@ describe("connectorNameFor", () => {
         workspaceId: "def456def456",
         hadEndpointBefore: false,
       })
-    ).toBe("Codex with ChatGPT · Landing");
+    ).toBe("Codex Web Planner · Landing");
   });
 });
 

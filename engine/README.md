@@ -1,10 +1,15 @@
-# Embedded engine
+# Codex Web Planner engine
 
-This directory contains the embedded MIT-licensed `codex-with-chatgpt` engine used by Codex Web Planner.
+This directory contains the local runtime bundled by the Codex Web Planner plugin.
+It starts the workspace bridge, exposes the scoped MCP endpoint, waits for the user's
+ChatGPT authorization, and records local status and usage metrics.
 
-The public plugin entry point is the repository root and `.codex-plugin/plugin.json`. Install and use the
-`codex-web-planner` skill from `skills/codex-web-planner/`; the embedded engine's upstream skill is not a
-second plugin skill and is intentionally not loaded separately.
+The engine is embedded in the public `codex-web-planner` plugin. Users should install
+that plugin through Codex; they do not need to install this directory or a separate
+upstream product. The upstream MIT license and attribution are retained in
+`LICENSE` and `../THIRD_PARTY_NOTICES.md`.
 
-See [LICENSE](LICENSE) for the engine license and [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) for
-third-party attribution. Engine implementation details and tests remain in this directory.
+## Development
+
+Use `pnpm install` and `pnpm build` for a source checkout. The published plugin includes
+`dist/`, so a clean user install needs only production dependencies.

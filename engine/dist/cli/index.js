@@ -51,6 +51,17 @@ function usageDisplay(usage, enabled) {
 function resolveWorkspace(option) {
     return path.resolve(option ?? process.cwd());
 }
+function openChatGptSettings() {
+    const url = CHATGPT_CREATE_CONNECTOR_URL;
+    const command = process.platform === "darwin" ? "open" : process.platform === "win32" ? "cmd" : "xdg-open";
+    const args = process.platform === "win32" ? ["/c", "start", "", url] : [url];
+    try {
+        spawnSync(command, args, { stdio: "ignore", windowsHide: true });
+    }
+    catch {
+        // The URL is always printed; opening a browser is best effort.
+    }
+}
 function parseInteger(value) {
     const normalized = value.trim();
     if (!/^-?\d+$/.test(normalized)) {
@@ -247,6 +258,7 @@ program
             });
         const pairingResult = await adminFetch(runtime, "POST", "/admin/pairing");
         const tunnelState = readTunnelState(info.workspaceId);
+        openChatGptSettings();
         if (opts.json) {
             say(JSON.stringify({
                 ok: true,
@@ -257,6 +269,7 @@ program
                 local: mcpUrl === null,
                 pairingCode: pairingResult.code,
                 pairingExpiresAt: pairingResult.expiresAt,
+                chatgptSettingsUrl: CHATGPT_CREATE_CONNECTOR_URL,
                 sandbox,
                 tunnel: {
                     mode: isNamedTunnelReady(tunnelState) ? "named" : "quick",
@@ -271,10 +284,12 @@ program
         if (mcpUrl)
             check("安全连接已建立");
         say("");
-        say(`连接地址：${mcpUrl ?? `http://127.0.0.1:${runtime.port}/mcp`}`);
+        say("⚠️⚠️⚠️ 需要在 ChatGPT 网页完成一次授权 ⚠️⚠️⚠️");
+        say(`ChatGPT 设置入口：${CHATGPT_CREATE_CONNECTOR_URL}`);
+        say(`MCP 连接地址：${mcpUrl ?? `http://127.0.0.1:${runtime.port}/mcp`}`);
         say(`配对码：${pairingResult.code}（${Math.round((pairingResult.expiresAt - Date.now()) / 60000)} 分钟内有效）`);
         say("");
-        say("下一步：在 ChatGPT 的连接器设置中添加以上地址（OAuth），并在授权页输入配对码。");
+        say("下一步：打开上面的 ChatGPT 设置入口 → 添加连接器 → 选择 OAuth → 粘贴 MCP 地址 → 输入配对码。");
         say("如果你在使用 Codex Skill，这一步会自动完成。");
     }
     catch (error) {
@@ -295,9 +310,13 @@ program
     const timeoutMs = timeoutSeconds * 1000;
     const intervalMs = Math.max(1, Number(opts.intervalSeconds)) * 1000;
     const started = Date.now();
+    let lastNotice = started;
     const workspace = new Workspace(root);
-    if (!opts.json)
-        say("[4/5] 等待 ChatGPT 完成授权……");
+    if (!opts.json) {
+        say("⚠️⚠️⚠️ [4/5] 正在等待 ChatGPT 授权 ⚠️⚠️⚠️");
+        say(`请打开 ChatGPT 设置：${CHATGPT_CREATE_CONNECTOR_URL}`);
+        say("授权完成后 Codex 会自动继续，请不要关闭当前终端。");
+    }
     while (Date.now() - started <= timeoutMs) {
         const observation = await findBridgeObservation(workspace.id);
         if (observation.state === "healthy") {
@@ -312,6 +331,11 @@ program
                 }
                 return;
             }
+        }
+        if (!opts.json && Date.now() - lastNotice >= 30_000) {
+            const remaining = Math.max(0, timeoutMs - (Date.now() - started));
+            say(`⏳ 仍在等待 ChatGPT 授权，剩余约 ${Math.ceil(remaining / 60_000)} 分钟……`);
+            lastNotice = Date.now();
         }
         await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
@@ -580,7 +604,7 @@ program
             previousName: lastEndpoint?.connectorName,
             hadEndpointBefore: Boolean(lastEndpoint),
         })
-        : "Codex with ChatGPT";
+        : "Codex Web Planner";
     const tunnelState = workspace ? readTunnelState(workspace.id) : null;
     const namedReady = tunnelState ? isNamedTunnelReady(tunnelState) : false;
     let namedRepair = { needed: false };

@@ -64,13 +64,13 @@ describe("resolveConversation", () => {
       conversationMode: "project",
       projectUrl: PROJECT,
       url: "https://chatgpt.com/c/thread-1",
-      connectorName: "Codex with ChatGPT · Demo",
+      connectorName: "Codex Web Planner · Demo",
       savedAt: "2026-01-01T00:00:00.000Z",
     });
     expect(view.mode).toBe("project");
     expect(view.projectReady).toBe(true);
     expect(view.reuseSavedChat).toBe(false);
-    expect(view.connectorName).toBe("Codex with ChatGPT · Demo");
+    expect(view.connectorName).toBe("Codex Web Planner · Demo");
   });
 });
 
@@ -80,7 +80,7 @@ describe("mergeSession", () => {
       {
         conversationMode: "project",
         projectUrl: PROJECT,
-        connectorName: "Codex with ChatGPT · Demo",
+        connectorName: "Codex Web Planner · Demo",
         url: "https://chatgpt.com/c/old",
         savedAt: "2026-01-01T00:00:00.000Z",
       },
@@ -89,7 +89,7 @@ describe("mergeSession", () => {
     expect(next.projectUrl).toBe(PROJECT);
     expect(next.conversationMode).toBe("project");
     expect(next.url).toBe("https://chatgpt.com/c/new");
-    expect(next.connectorName).toBe("Codex with ChatGPT · Demo");
+    expect(next.connectorName).toBe("Codex Web Planner · Demo");
     expect(next.taskId).toBe("c2c_ab12");
   });
 
@@ -201,7 +201,7 @@ describe("clearChatPointer", () => {
       conversationMode: "project",
       projectUrl: PROJECT,
       url: "https://chatgpt.com/c/gone",
-      connectorName: "Codex with ChatGPT · Demo",
+      connectorName: "Codex Web Planner · Demo",
       checkpoint: {
         taskId: "c2c_ab12",
         iteration: 4,

@@ -3,7 +3,7 @@ import { getStateDir, readJsonIfExists, writeSecureJson } from "./paths.js";
 export const CHATGPT_DEVELOPER_MODE_URL = "https://chatgpt.com/#settings/Security";
 export const CHATGPT_PLUGINS_URL = "https://chatgpt.com/plugins";
 export const CHATGPT_CREATE_CONNECTOR_URL = "https://chatgpt.com/plugins#settings/Connectors?create-connector=true&redirectAfter=%2Fplugins";
-export const DEFAULT_CONNECTOR_NAME = "Codex with ChatGPT";
+export const DEFAULT_CONNECTOR_NAME = "Codex Web Planner";
 export function endpointFile(workspaceId) {
     return path.join(getStateDir(), "endpoints", `${workspaceId}.json`);
 }
@@ -42,7 +42,7 @@ export function sanitizeConnectorLabel(name, workspaceId) {
 /**
  * Same workspace keeps one connector title forever.
  * A workspace already recorded without a title stays on the original
- * "Codex with ChatGPT" name. A new workspace gets a distinct title.
+ * "Codex Web Planner" name. A new workspace gets a distinct title.
  */
 export function connectorNameFor(opts) {
     if (opts.previousName?.trim())
