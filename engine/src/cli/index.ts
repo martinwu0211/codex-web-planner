@@ -413,8 +413,27 @@ program
       recentMcpExchange: hasRecentExchange,
       lastMcpExchangeAt: usage.requests > 0 ? usage.updatedAt : null,
     };
+    const diagnostic = chatgptConnection.authorized
+      ? chatgptConnection.recentMcpExchange
+        ? { code: "OK", message: "ChatGPT 已授权且最近有 MCP 通信。", nextAction: null }
+        : {
+            code: "CHATGPT_NO_RECENT_MCP",
+            message: "ChatGPT 已授权，但最近 10 分钟没有收到请求；连接器可能未打开或会话未刷新。",
+            nextAction: "打开已连接的 ChatGPT 对话并刷新；然后重新运行 c2c status。",
+          }
+      : info.pairingActive
+        ? {
+            code: "CHATGPT_PAIRING_PENDING",
+            message: "Bridge 正在等待 ChatGPT 完成配对授权。",
+            nextAction: "运行 c2c setup，使用显示的连接地址和配对码完成授权。",
+          }
+        : {
+            code: "CHATGPT_NOT_AUTHORIZED",
+            message: "Bridge 正常运行，但 ChatGPT 尚未授权此工作区。",
+            nextAction: "运行 c2c setup，然后在 ChatGPT 连接器设置中添加地址并输入配对码。",
+          };
     if (opts.json) {
-      say(JSON.stringify({ ok: true, running: true, ...info, chatgptConnection, tokenMetrics }));
+      say(JSON.stringify({ ok: true, running: true, ...info, chatgptConnection, diagnostic, tokenMetrics }));
       return;
     }
     say(PRODUCT_NAME);
@@ -427,6 +446,11 @@ program
     if (chatgptConnection.recentMcpExchange) say("· ChatGPT 通信：最近 10 分钟有响应");
     else if (chatgptConnection.lastMcpExchangeAt) say(`· ChatGPT 通信：上次响应 ${chatgptConnection.lastMcpExchangeAt}`);
     else say("· ChatGPT 通信：尚未检测到；运行 `c2c setup` 完成连接");
+    if (diagnostic.code !== "OK") {
+      say(`· 错误码：${diagnostic.code}`);
+      say(`· 说明：${diagnostic.message}`);
+      say(`· 处理：${diagnostic.nextAction}`);
+    }
     if (tokenMetrics.enabled) {
       say(`· MCP 计数：${usage.requests} 次，估算 ${usage.estimatedInputTokens + usage.estimatedOutputTokens} tokens`);
     } else say("· MCP 计数：已关闭");
