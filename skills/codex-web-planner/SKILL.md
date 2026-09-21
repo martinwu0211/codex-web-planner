@@ -9,7 +9,7 @@ Use this skill when the user asks to plan, review, or execute a coding task with
 
 ## Behavior
 
-1. On first use, run the bundled setup flow. Do not merely say that setup started: run `c2c status --json` afterward and report `chatgptConnection.authorized`. If it is false, guide the user through the shortest path: run `c2c setup`, open the displayed connection address in ChatGPT's connector settings, enter the displayed pairing code, then rerun `c2c status --json` until authorization is confirmed. If it is true but `recentMcpExchange` is false, report that authorization exists but no recent ChatGPT request has been observed, and ask the user to open or refresh the connected ChatGPT conversation.
+1. On first use, run the bundled setup flow from this installed plugin. Do not require a global npm install, PATH change, or a manually installed `c2c`: resolve the plugin's bundled `engine/bin/c2c.js` and invoke it with Node when the `c2c` command is unavailable. Do not merely say that setup started: run the bundled CLI's `status --json` afterward and report `chatgptConnection.authorized`. If it is false, guide the user through the shortest path: run the bundled CLI's `setup`, open the displayed connection address in ChatGPT's connector settings, enter the displayed pairing code, then rerun `status --json` until authorization is confirmed. If it is true but `recentMcpExchange` is false, report that authorization exists but no recent ChatGPT request has been observed, and ask the user to open or refresh the connected ChatGPT conversation.
    Treat `diagnostic.code`, `diagnostic.message`, and `diagnostic.nextAction` as the source of truth for connection errors. Explain the error in one sentence, execute the suggested local command when it is safe, and re-check status. Do not repeatedly ask the user to retry the same step.
 2. Keep workspace access read-only for ChatGPT. Do not upload the repository as an archive.
 3. Send only compact control messages between Codex and ChatGPT. Let ChatGPT read the required files through MCP.
@@ -35,9 +35,9 @@ Use this internal prompt at the start of every planner request:
 
 ```text
 You are operating Codex Web Planner. Before asking the user anything, verify the ChatGPT connection with:
-  c2c status --json
+  c2c status --json (or the bundled engine CLI via `node engine/bin/c2c.js status --json` when c2c is not on PATH)
 Read diagnostic.code, diagnostic.message, and diagnostic.nextAction.
-If the bridge is stopped or unhealthy, run the safe local repair (c2c start or c2c doctor --no-fix for diagnosis, then c2c doctor when repair is appropriate) and check status again.
+If the bridge is stopped or unhealthy, run the safe local repair using the bundled engine (c2c start or the bundled `node engine/bin/c2c.js doctor --no-fix` for diagnosis, then doctor when repair is appropriate) and check status again.
 If the error is CHATGPT_NOT_AUTHORIZED or CHATGPT_PAIRING_PENDING, run c2c setup and present the displayed address and pairing code with three short steps for the user to complete authorization in ChatGPT. Do not request credentials or claim success before status reports authorized=true.
 If the error is CHATGPT_NO_RECENT_MCP, tell the user authorization exists but ChatGPT has not contacted the bridge; ask them to open or refresh the connected ChatGPT conversation, then check status again.
 If diagnostic.code is OK, proceed with the requested plan/review. Always report the final connection state and any unresolved error code.
