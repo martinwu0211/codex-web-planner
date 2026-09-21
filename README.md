@@ -12,6 +12,8 @@ Import this plugin directory into Codex, then ask Codex:
 
 The first setup builds the local bridge and opens the one-time ChatGPT authorization step. Use your own ChatGPT account. After setup, ask Codex to use the planner for a coding task.
 
+The plugin checks the connection before planning. `c2c status` reports whether the ChatGPT connector is authorized and whether an MCP request was seen in the last ten minutes. If it is not connected, run `c2c setup`, add the displayed connection address in ChatGPT, enter the pairing code, and run `c2c status` again.
+
 ## What this version promises
 
 - ChatGPT receives read-only workspace context through MCP.

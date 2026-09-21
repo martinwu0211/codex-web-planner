@@ -406,8 +406,15 @@ program
     const info = await adminFetch<AdminInfo>(runtime, "GET", "/admin/info");
     const usage = readTokenUsage();
     const tokenMetrics = { enabled: readUiPrefs().tokenMetricsEnabled, ...usage };
+    const lastExchangeMs = Date.parse(usage.updatedAt);
+    const hasRecentExchange = Number.isFinite(lastExchangeMs) && lastExchangeMs > 0 && Date.now() - lastExchangeMs <= 10 * 60 * 1000;
+    const chatgptConnection = {
+      authorized: info.tokenCount > 0,
+      recentMcpExchange: hasRecentExchange,
+      lastMcpExchangeAt: usage.requests > 0 ? usage.updatedAt : null,
+    };
     if (opts.json) {
-      say(JSON.stringify({ ok: true, running: true, ...info, tokenMetrics }));
+      say(JSON.stringify({ ok: true, running: true, ...info, chatgptConnection, tokenMetrics }));
       return;
     }
     say(PRODUCT_NAME);
@@ -416,7 +423,10 @@ program
     check(`Bridge：运行中（端口 ${info.port}）`);
     if (info.tunnel.running && info.tunnel.url) check(`安全连接：${info.tunnel.url}/mcp`);
     else say("· 安全连接：未启用（本地模式）");
-    say(`· 已授权连接：${info.tokenCount > 0 ? "是" : "否"}`);
+    say(`· ChatGPT 授权：${chatgptConnection.authorized ? "已连接" : "未连接"}`);
+    if (chatgptConnection.recentMcpExchange) say("· ChatGPT 通信：最近 10 分钟有响应");
+    else if (chatgptConnection.lastMcpExchangeAt) say(`· ChatGPT 通信：上次响应 ${chatgptConnection.lastMcpExchangeAt}`);
+    else say("· ChatGPT 通信：尚未检测到；运行 `c2c setup` 完成连接");
     if (tokenMetrics.enabled) {
       say(`· MCP 计数：${usage.requests} 次，估算 ${usage.estimatedInputTokens + usage.estimatedOutputTokens} tokens`);
     } else say("· MCP 计数：已关闭");
