@@ -372,7 +372,9 @@ program
   .option("--json", "machine-readable output", false)
   .action(async (opts: { workspace?: string; timeoutSeconds: string; intervalSeconds: string; json: boolean }) => {
     const root = resolveWorkspace(opts.workspace);
-    const timeoutMs = Math.max(1, Number(opts.timeoutSeconds)) * 1000;
+    const requestedTimeoutSeconds = Math.max(1, Number(opts.timeoutSeconds));
+    const timeoutSeconds = Math.min(20 * 60, requestedTimeoutSeconds);
+    const timeoutMs = timeoutSeconds * 1000;
     const intervalMs = Math.max(1, Number(opts.intervalSeconds)) * 1000;
     const started = Date.now();
     const workspace = new Workspace(root);
@@ -393,7 +395,7 @@ program
       }
       await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
-    const result = { ok: false, authorized: false, code: "CHATGPT_AUTH_TIMEOUT", message: "等待授权超时；连接器尚未完成 ChatGPT 授权。", nextAction: "确认已在 ChatGPT 连接器设置中完成授权后，再运行 c2c wait-auth。" };
+    const result = { ok: false, authorized: false, code: "CHATGPT_AUTH_TIMEOUT", message: `等待授权 ${Math.round(timeoutSeconds / 60)} 分钟后仍未完成；任务已中止，未继续后续安装。`, nextAction: "用户输入“继续”或“重新连接”后，重新运行 setup 生成新的网页配对地址和配对码，再开始下一轮等待。" };
     if (opts.json) say(JSON.stringify(result));
     else {
       cross(`错误码：${result.code}`);

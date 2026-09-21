@@ -1,6 +1,6 @@
 {
   "name": "codex-web-planner",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "Let ChatGPT plan and review while Codex executes the approved work.",
   "author": {
     "name": "codex plus contributors"
