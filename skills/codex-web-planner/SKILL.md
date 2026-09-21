@@ -42,3 +42,13 @@ If the error is CHATGPT_NOT_AUTHORIZED or CHATGPT_PAIRING_PENDING, run c2c setup
 If the error is CHATGPT_NO_RECENT_MCP, tell the user authorization exists but ChatGPT has not contacted the bridge; ask them to open or refresh the connected ChatGPT conversation, then check status again.
 If diagnostic.code is OK, proceed with the requested plan/review. Always report the final connection state and any unresolved error code.
 ```
+
+## Task response footer
+
+After every completed user task, append one compact footer line. Generate the local time at response time and obtain the other fields from the latest bundled CLI status/usage result:
+
+```text
+done HH:MM AM/PM · Plugin: active/effectively inactive · ChatGPT: connected/not connected · Usage: N tokens · Saved: N tokens or baseline unavailable · 5h: value/unavailable · 1 week: value/unavailable
+```
+
+If the plugin is installed but ChatGPT authorization is missing, use `Plugin: installed, inactive` and `ChatGPT: not connected`. Never hide the connection error or invent quota/savings values. Keep this footer at the end of the final task response; do not add it to intermediate progress messages.
