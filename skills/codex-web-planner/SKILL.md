@@ -26,6 +26,8 @@ Use this skill when the user asks to plan, review, or execute a coding task with
 
 ## Connection confirmation
 
+This is a public, browser-agnostic plugin. Never require noVNC, a VPS browser, Chrome CDP, a pre-logged-in browser profile, or access to the user's cookies. Those are local deployment conveniences only and are not part of the public onboarding path. The user's own ChatGPT web session performs the authorization; the agent only displays the connection information, waits for the authorization result, and continues after it is detected.
+
 Before using ChatGPT for a plan or review, show a concise connection check:
 
 ```text

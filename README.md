@@ -14,6 +14,10 @@ The first setup builds the local bridge and opens the one-time ChatGPT authoriza
 
 The plugin checks the connection before planning. `c2c status --json` reports an error code, a plain-language explanation, and the next action. The agent uses that diagnostic to repair the local bridge automatically when possible. If user authorization is required, it gives the displayed connection address and pairing code, then verifies the result instead of claiming success early.
 
+### Public installation boundary
+
+The public plugin does not depend on noVNC, a VPS, Chrome CDP, a pre-authenticated browser, or stored browser cookies. Each user completes the ChatGPT authorization in their own supported ChatGPT web interface. The local bridge only creates the secure MCP endpoint, reports progress, polls authorization, and continues after the user's authorization is detected.
+
 ## What this version promises
 
 - ChatGPT receives read-only workspace context through MCP.
