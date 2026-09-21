@@ -3,19 +3,13 @@ import { existsSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { createRequire } from "node:module";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.join(here, "..", "dist", "cli", "index.js");
 const engineRoot = path.join(here, "..");
 
 function runtimeReady() {
-  try {
-    createRequire(import.meta.url).resolve("commander");
-    return true;
-  } catch {
-    return false;
-  }
+  return existsSync(path.join(engineRoot, "node_modules", "commander"));
 }
 
 if (!runtimeReady()) {
