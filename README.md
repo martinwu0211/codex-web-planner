@@ -41,3 +41,7 @@ MIT. See `LICENSE` and `THIRD_PARTY_NOTICES.md`.
 ### CLI status footer
 
 Every `c2c status`/`c2c usage` invocation shows the plugin state, Usage, saved-token estimate, and the `5h`/`1 week` quota fields. If ChatGPT is not authorized, the footer says `插件：未生效（ChatGPT 未连接）` and the diagnostic gives the exact repair command. Saved tokens require a trusted comparison baseline via `C2C_BASELINE_TOKENS`; quota values can be supplied by a trusted host integration with `C2C_QUOTA_5H` and `C2C_QUOTA_WEEK`.
+
+## Resident interactive session
+
+To keep the Codex prompt alive after each task, run `scripts/start-resident.sh` from a real terminal. It uses a tmux session named `codex-planner`; detach with `Ctrl-B`, `D`, and reconnect with the same script. This is the same persistence pattern used by the Feishu/Lark workers.
