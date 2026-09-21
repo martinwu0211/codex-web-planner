@@ -379,7 +379,7 @@ program
     if (!opts.json) say("[4/5] 等待 ChatGPT 完成授权……");
     while (Date.now() - started <= timeoutMs) {
       const observation = await findBridgeObservation(workspace.id);
-      if (observation.state === "running") {
+      if (observation.state === "healthy") {
         const info = await adminFetch<AdminInfo>(observation.runtime, "GET", "/admin/info");
         if (info.tokenCount > 0) {
           const result = { ok: true, authorized: true, workspaceId: workspace.id, elapsedSeconds: Math.round((Date.now() - started) / 1000) };
