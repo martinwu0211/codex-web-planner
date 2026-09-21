@@ -20,6 +20,7 @@ if (!runtimeReady()) {
   const result = spawnSync(installer[0], [...installer.slice(1), "install", "--prod", "--frozen-lockfile"], {
     cwd: engineRoot,
     stdio: "inherit",
+    env: { ...process.env, CI: "true" },
   });
   if (result.status !== 0 || !runtimeReady()) {
     process.stderr.write("codex-web-planner: dependency setup failed; rerun the plugin setup from Codex.\n");
