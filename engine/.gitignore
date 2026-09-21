@@ -1,5 +1,5 @@
 node_modules/
-dist/
+# dist/ is committed because the public plugin must run without devDependencies.
 .tooling/
 .pnpm-store/
 *.log

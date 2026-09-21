@@ -1,5 +1,6 @@
 engine/node_modules/
-engine/dist/
+# The published plugin ships compiled engine/dist so a clean user does not
+# need devDependencies such as tsx just to start the bundled CLI.
 engine/.tooling/
 engine/.pnpm-store/
 *.log

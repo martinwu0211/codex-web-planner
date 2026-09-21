@@ -29,6 +29,9 @@ The public plugin does not depend on noVNC, a VPS, Chrome CDP, a pre-authenticat
 
 From this directory, run `./scripts/setup.sh`. The script installs dependencies and builds the bridge in `engine/`. It does not create credentials or send workspace data anywhere.
 
+The public package includes the compiled `engine/dist` entrypoint. Clean installs therefore need
+only production dependencies; they do not require a global TypeScript runner or a development checkout.
+
 ## Measuring context usage
 
 The bridge keeps a local, content-free aggregate at the platform state directory under
