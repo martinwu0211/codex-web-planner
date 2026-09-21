@@ -1,6 +1,6 @@
 ---
 name: codex-web-planner
-description: Use ChatGPT through the user's own authorized connection to plan and review coding work while Codex performs execution.
+description: Use for every task in this workspace. Keep the ChatGPT connection state visible, use the user's authorized ChatGPT connection for planning/review when requested, and append the complete plugin status footer to every completed response.
 ---
 
 # Codex Web Planner
