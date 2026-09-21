@@ -1,27 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { ensureDir, getStateDir } from "../config/paths.js";
+import { appendAudit, redact as auditRedact } from "../audit/index.js";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 const LEVELS: Record<LogLevel, number> = { debug: 10, info: 20, warn: 30, error: 40 };
 
-/**
- * Secret redaction. Logs must never contain tokens, pairing codes or credentials.
- */
-const REDACT_PATTERNS: RegExp[] = [
-  /c2c_(?:at|rt|ac|admin)_[A-Za-z0-9_-]+/g,
-  /(authorization"?\s*[:=]\s*"?bearer\s+)[^\s"']+/gi,
-  /((?:access_token|refresh_token|client_secret|code_verifier|code|token)"?\s*[:=]\s*"?)[A-Za-z0-9._~+/-]{16,}/gi,
-  /\b[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}\b/g, // pairing-code shaped strings
-];
-
-export function redact(input: string): string {
-  let out = input;
-  for (const pattern of REDACT_PATTERNS) {
-    out = out.replace(pattern, (_m, g1) => (typeof g1 === "string" ? `${g1}[REDACTED]` : "[REDACTED]"));
-  }
-  return out;
-}
+export const redact = auditRedact;
 
 export interface LoggerOptions {
   name?: string;
@@ -66,6 +51,7 @@ export class Logger {
         // logging must never crash the bridge
       }
     }
+    appendAudit({ event: `log.${level}`, detail: { logger: this.name, message: redact(msg) } });
     if (this.useConsole) process.stderr.write(line);
   }
 

@@ -57,6 +57,7 @@ import {
 import { appendExecutionRecord } from "../execution/records.js";
 import { saveExecutionOutput } from "../execution/output.js";
 import { readTokenUsage } from "../metrics/token-counter.js";
+import { appendAudit, auditFile, readAuditTail } from "../audit/index.js";
 
 const program = new Command();
 
@@ -65,6 +66,12 @@ const say = (msg: string): void => {
 };
 const check = (msg: string): void => say(`✓ ${msg}`);
 const cross = (msg: string): void => say(`✗ ${msg}`);
+
+appendAudit({
+  event: "cli.started",
+  result: "pending",
+  detail: { command: process.argv[2] ?? "help" },
+});
 
 function usageDisplay(usage: ReturnType<typeof readTokenUsage>, enabled: boolean) {
   const usedTokens = usage.estimatedInputTokens + usage.estimatedOutputTokens;
@@ -880,6 +887,22 @@ program
 // ---------------------------------------------------------------- logs / workspace / record
 
 program
+  .command("audit")
+  .description("Show the external lifecycle audit trail")
+  .option("-n, --lines <n>", "number of events", "100")
+  .option("--json", "machine-readable output", false)
+  .action((opts: { lines: string; json: boolean }) => {
+    const lines = readAuditTail(Number(opts.lines));
+    if (opts.json) {
+      say(JSON.stringify({ ok: true, file: auditFile(), events: lines.map((line) => JSON.parse(line)) }));
+      return;
+    }
+    say(`审计日志：${auditFile()}`);
+    if (lines.length === 0) say("暂无审计事件。");
+    else say(lines.join("\n"));
+  });
+
+program
   .command("logs")
   .description("Show recent bridge logs")
   .option("-w, --workspace <path>")
@@ -1377,6 +1400,7 @@ acceptUnusedWorkspaceOption(
 
 function handleCliError(error: unknown, json: boolean): void {
   const message = error instanceof Error ? error.message : String(error);
+  appendAudit({ event: "cli.error", result: "error", detail: { message } });
   if (json) {
     say(JSON.stringify({ ok: false, error: message }));
   } else if (message.startsWith("NEED_CLOUDFLARED")) {
@@ -1391,7 +1415,11 @@ function handleCliError(error: unknown, json: boolean): void {
   process.exitCode = 1;
 }
 
-program.parseAsync(process.argv).catch((error: Error) => {
-  cross(error.message);
-  process.exit(1);
-});
+program
+  .parseAsync(process.argv)
+  .then(() => appendAudit({ event: "cli.completed", result: "ok", detail: { command: process.argv[2] ?? "help" } }))
+  .catch((error: Error) => {
+    appendAudit({ event: "cli.completed", result: "error", detail: { command: process.argv[2] ?? "help", message: error.message } });
+    cross(error.message);
+    process.exit(1);
+  });

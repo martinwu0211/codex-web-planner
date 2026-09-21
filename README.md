@@ -38,6 +38,15 @@ file to compare the compact control-message workflow with a baseline task run. T
 the current total under `c2c status`; use `c2c usage` for the full breakdown. To disable or restore
 new measurements, run `c2c prefs set --token-metrics off` or `c2c prefs set --token-metrics on`.
 
+## External audit log
+
+For clean-install testing, the bridge writes a machine-readable lifecycle trail outside the project
+workspace at the platform state directory under `audit/events.jsonl`. It records command and bridge
+phases, authorization state, MCP exchanges, and errors so a workspace can be deleted and recreated
+without losing the installation history. The fixed audit writer is the only code path that owns this
+file; `c2c audit` displays its recent events. Sensitive values, pairing codes, tokens, cookies,
+prompts, command output, and file contents are redacted or omitted. The log is owner-readable only.
+
 ## License
 
 MIT. See `LICENSE` and `THIRD_PARTY_NOTICES.md`.
