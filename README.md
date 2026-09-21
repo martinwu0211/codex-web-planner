@@ -14,6 +14,24 @@ The first setup builds the local bridge and opens the one-time ChatGPT authoriza
 
 The plugin checks the connection before planning. `c2c status --json` reports an error code, a plain-language explanation, and the next action. The agent uses that diagnostic to repair the local bridge automatically when possible. If user authorization is required, it gives the displayed connection address and pairing code, then verifies the result instead of claiming success early.
 
+### Clean public-install simulation
+
+To simulate a first-time user, create only an empty Codex home and project directory, start Codex,
+and give Codex the GitHub instruction. Do not run `c2c` or `codex plugin add` manually; Codex should
+discover the marketplace, install this plugin, bootstrap its dependencies, and continue onboarding.
+
+```bash
+TEST_ROOT=$(mktemp -d "$HOME/codex-web-planner-test.XXXXXX")
+export CODEX_HOME="$TEST_ROOT/codex-home"
+mkdir -p "$CODEX_HOME" "$TEST_ROOT/workspace"
+cd "$TEST_ROOT/workspace"
+codex
+```
+
+Then tell Codex:
+
+> Install and set up `https://github.com/martinwu0211/codex-web-planner` for this workspace. Handle dependencies and ChatGPT authorization automatically, and stop only when the connection test succeeds.
+
 ### Public installation boundary
 
 The public plugin does not depend on noVNC, a VPS, Chrome CDP, a pre-authenticated browser, or stored browser cookies. Each user completes the ChatGPT authorization in their own supported ChatGPT web interface. The local bridge only creates the secure MCP endpoint, reports progress, polls authorization, and continues after the user's authorization is detected.
