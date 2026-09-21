@@ -395,7 +395,8 @@ program
       }
       await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
-    const result = { ok: false, authorized: false, code: "CHATGPT_AUTH_TIMEOUT", message: `等待授权 ${Math.round(timeoutSeconds / 60)} 分钟后仍未完成；任务已中止，未继续后续安装。`, nextAction: "用户输入“继续”或“重新连接”后，重新运行 setup 生成新的网页配对地址和配对码，再开始下一轮等待。" };
+    const waitedFor = timeoutSeconds < 60 ? `${timeoutSeconds} 秒` : `${Math.round(timeoutSeconds / 60)} 分钟`;
+    const result = { ok: false, authorized: false, code: "CHATGPT_AUTH_TIMEOUT", message: `等待授权 ${waitedFor} 后仍未完成；任务已中止，未继续后续安装。`, nextAction: "用户输入“继续”或“重新连接”后，重新运行 setup 生成新的网页配对地址和配对码，再开始下一轮等待。" };
     if (opts.json) say(JSON.stringify(result));
     else {
       cross(`错误码：${result.code}`);
