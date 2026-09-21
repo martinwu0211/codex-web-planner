@@ -66,6 +66,21 @@ const say = (msg: string): void => {
 const check = (msg: string): void => say(`✓ ${msg}`);
 const cross = (msg: string): void => say(`✗ ${msg}`);
 
+function usageDisplay(usage: ReturnType<typeof readTokenUsage>, enabled: boolean) {
+  const usedTokens = usage.estimatedInputTokens + usage.estimatedOutputTokens;
+  const rawBaseline = Number(process.env.C2C_BASELINE_TOKENS ?? "");
+  const baselineTokens = Number.isFinite(rawBaseline) && rawBaseline > 0 ? Math.floor(rawBaseline) : null;
+  return {
+    pluginEnabled: true,
+    usageEnabled: enabled,
+    usedTokens,
+    savedTokens: baselineTokens === null ? null : Math.max(0, baselineTokens - usedTokens),
+    baselineTokens,
+    fiveHourRemaining: process.env.C2C_QUOTA_5H ?? "unavailable",
+    weeklyRemaining: process.env.C2C_QUOTA_WEEK ?? "unavailable",
+  };
+}
+
 function resolveWorkspace(option?: string): string {
   return path.resolve(option ?? process.cwd());
 }
@@ -391,21 +406,42 @@ program
     const observation = await findBridgeObservation(workspace.id);
     if (observation.state === "unknown") {
       if (opts.json) {
-        say(JSON.stringify({ ok: false, running: null, state: "unknown", reason: observation.reason }));
+        say(JSON.stringify({
+          ok: false,
+          running: null,
+          state: "unknown",
+          reason: observation.reason,
+          diagnostic: {
+            code: "BRIDGE_STATUS_UNKNOWN",
+            message: `无法确认 Bridge 状态：${observation.reason}`,
+            nextAction: "运行 c2c doctor --no-fix 查看详细诊断。",
+          },
+        }));
       } else {
-        cross(`Bridge 状态无法确认（${observation.reason}），未将其视为未运行。`);
+        cross(`错误码：BRIDGE_STATUS_UNKNOWN；Bridge 状态无法确认（${observation.reason}）。`);
+        say("处理：运行 `c2c doctor --no-fix` 查看详细诊断。");
       }
       return;
     }
     if (observation.state === "stopped") {
-      if (opts.json) say(JSON.stringify({ ok: false, running: false }));
-      else say("Bridge 未运行。使用 `c2c start` 启动。");
+      const diagnostic = {
+        code: "BRIDGE_NOT_RUNNING",
+        message: "本地 Bridge 没有运行，因此无法确认 ChatGPT 连接。",
+        nextAction: "运行 c2c start，然后重新运行 c2c status。",
+      };
+      if (opts.json) say(JSON.stringify({ ok: false, running: false, diagnostic }));
+      else {
+        cross(`错误码：${diagnostic.code}；${diagnostic.message}`);
+        say(`处理：${diagnostic.nextAction}`);
+      }
       return;
     }
     const runtime = observation.runtime;
     const info = await adminFetch<AdminInfo>(runtime, "GET", "/admin/info");
     const usage = readTokenUsage();
-    const tokenMetrics = { enabled: readUiPrefs().tokenMetricsEnabled, ...usage };
+    const usageEnabled = readUiPrefs().tokenMetricsEnabled;
+    const tokenMetrics = { enabled: usageEnabled, ...usage };
+    const usageSummary = usageDisplay(usage, usageEnabled);
     const lastExchangeMs = Date.parse(usage.updatedAt);
     const hasRecentExchange = Number.isFinite(lastExchangeMs) && lastExchangeMs > 0 && Date.now() - lastExchangeMs <= 10 * 60 * 1000;
     const chatgptConnection = {
@@ -433,7 +469,7 @@ program
             nextAction: "运行 c2c setup，然后在 ChatGPT 连接器设置中添加地址并输入配对码。",
           };
     if (opts.json) {
-      say(JSON.stringify({ ok: true, running: true, ...info, chatgptConnection, diagnostic, tokenMetrics }));
+      say(JSON.stringify({ ok: true, running: true, ...info, chatgptConnection, diagnostic, tokenMetrics, usageSummary }));
       return;
     }
     say(PRODUCT_NAME);
@@ -451,9 +487,11 @@ program
       say(`· 说明：${diagnostic.message}`);
       say(`· 处理：${diagnostic.nextAction}`);
     }
-    if (tokenMetrics.enabled) {
-      say(`· MCP 计数：${usage.requests} 次，估算 ${usage.estimatedInputTokens + usage.estimatedOutputTokens} tokens`);
-    } else say("· MCP 计数：已关闭");
+    say(`· 插件：${chatgptConnection.authorized ? "已生效" : "未生效（ChatGPT 未连接）"}`);
+    say(`· Usage：${usageEnabled ? `${usage.requests} 次，估算 ${usageSummary.usedTokens} tokens` : "计数开关已关闭"}`);
+    say(`· 省下 token：${usageSummary.savedTokens === null ? "未设置基线，暂无法计算" : usageSummary.savedTokens}`);
+    say(`· 5h 剩余：${usageSummary.fiveHourRemaining === "unavailable" ? "暂不可读取" : usageSummary.fiveHourRemaining}`);
+    say(`· 1 week 剩余：${usageSummary.weeklyRemaining === "unavailable" ? "暂不可读取" : usageSummary.weeklyRemaining}`);
   });
 
 program
@@ -463,10 +501,15 @@ program
   .action((opts: { json: boolean }) => {
     const usage = readTokenUsage();
     const enabled = readUiPrefs().tokenMetricsEnabled;
-    if (opts.json) { say(JSON.stringify({ ok: true, enabled, ...usage })); return; }
-    say(enabled ? `MCP 计数：${usage.requests} 次` : "MCP 计数：已关闭");
+    const usageSummary = usageDisplay(usage, enabled);
+    if (opts.json) { say(JSON.stringify({ ok: true, enabled, ...usage, usageSummary })); return; }
+    say("插件：已启用（Codex Web Planner）");
+    say(enabled ? `Usage：${usage.requests} 次` : "Usage：计数开关已关闭");
     say(`输入：${usage.inputChars} 字符，输出：${usage.outputChars} 字符`);
     say(`估算 token：输入 ${usage.estimatedInputTokens}，输出 ${usage.estimatedOutputTokens}`);
+    say(`省下 token：${usageSummary.savedTokens === null ? "未设置基线，暂无法计算" : usageSummary.savedTokens}`);
+    say(`5h 剩余：${usageSummary.fiveHourRemaining === "unavailable" ? "暂不可读取" : usageSummary.fiveHourRemaining}`);
+    say(`1 week 剩余：${usageSummary.weeklyRemaining === "unavailable" ? "暂不可读取" : usageSummary.weeklyRemaining}`);
   });
 
 // ---------------------------------------------------------------- doctor
