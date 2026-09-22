@@ -1279,9 +1279,11 @@ plannerCmd.command("status").option("--json", "machine-readable output", false).
     else
         say(task ? `${task.taskId} · ${task.phase} · ${task.updatedAt}` : "No planner task is active.");
 });
-plannerCmd.command("start").requiredOption("--goal <goal>", "task goal").option("--timeout <seconds>", "ChatGPT timeout", "120").option("--json", "machine-readable output", false)
+plannerCmd.command("start").requiredOption("--goal <goal>", "task goal").option("--mode <mode>", "auto, chat, or codex", "auto").option("--timeout <seconds>", "ChatGPT timeout", "120").option("--json", "machine-readable output", false)
     .action(async (opts) => { try {
-    const result = await startPlanning(opts.goal, Number(opts.timeout) * 1000);
+    if (!["auto", "chat", "codex"].includes(opts.mode))
+        throw new Error("mode must be auto, chat, or codex");
+    const result = await startPlanning(opts.goal, Number(opts.timeout) * 1000, opts.mode);
     if (opts.json)
         say(JSON.stringify(result));
     else {

@@ -51,6 +51,14 @@ async function pages(debugPort: number): Promise<DevtoolsPage[]> {
   catch { return []; }
 }
 
+async function openChatGptPage(debugPort: number): Promise<void> {
+  try {
+    const targets = await pages(debugPort);
+    if (targets.some((page) => /chatgpt\.com|chat\.openai\.com/i.test(page.url ?? ""))) return;
+    await fetch(`http://127.0.0.1:${debugPort}/json/new?${encodeURIComponent("https://chatgpt.com/")}`, { method: "PUT" });
+  } catch { /* browser may not support remote page creation */ }
+}
+
 async function evaluate(wsUrl: string, expression: string): Promise<unknown> {
   return await new Promise((resolve, reject) => {
     const socket = new WebSocket(wsUrl);
@@ -136,7 +144,7 @@ function processExists(pid: number): boolean { try { process.kill(pid, 0); retur
 
 export async function startBrowser(debugPort = 9222): Promise<BrowserStatus> {
   const before = await browserStatus(debugPort);
-  if (before.state === "running") return before;
+  if (before.state === "running") { await openChatGptPage(debugPort); return browserStatus(debugPort); }
   if (!before.executable) return before;
   ensureDir(path.dirname(runtimeFile()));
   ensureDir(profileDir());
@@ -147,6 +155,7 @@ export async function startBrowser(debugPort = 9222): Promise<BrowserStatus> {
   child.unref();
   fs.writeFileSync(runtimeFile(), JSON.stringify({ pid: child.pid, port: debugPort }) + "\n", { mode: 0o600 });
   for (let i = 0; i < 30; i += 1) { if ((await browserStatus(debugPort)).state === "running") break; await new Promise((resolve) => setTimeout(resolve, 200)); }
+  await openChatGptPage(debugPort);
   return browserStatus(debugPort);
 }
 

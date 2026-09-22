@@ -42,6 +42,15 @@ async function pages(debugPort) {
         return [];
     }
 }
+async function openChatGptPage(debugPort) {
+    try {
+        const targets = await pages(debugPort);
+        if (targets.some((page) => /chatgpt\.com|chat\.openai\.com/i.test(page.url ?? "")))
+            return;
+        await fetch(`http://127.0.0.1:${debugPort}/json/new?${encodeURIComponent("https://chatgpt.com/")}`, { method: "PUT" });
+    }
+    catch { /* browser may not support remote page creation */ }
+}
 async function evaluate(wsUrl, expression) {
     return await new Promise((resolve, reject) => {
         const socket = new WebSocket(wsUrl);
@@ -163,8 +172,10 @@ catch {
 } }
 export async function startBrowser(debugPort = 9222) {
     const before = await browserStatus(debugPort);
-    if (before.state === "running")
-        return before;
+    if (before.state === "running") {
+        await openChatGptPage(debugPort);
+        return browserStatus(debugPort);
+    }
     if (!before.executable)
         return before;
     ensureDir(path.dirname(runtimeFile()));
@@ -180,6 +191,7 @@ export async function startBrowser(debugPort = 9222) {
             break;
         await new Promise((resolve) => setTimeout(resolve, 200));
     }
+    await openChatGptPage(debugPort);
     return browserStatus(debugPort);
 }
 export async function stopBrowser(debugPort = 9222) {
