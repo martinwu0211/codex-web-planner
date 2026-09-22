@@ -151,7 +151,7 @@ async function chatgptState(debugPort) {
     if (!chat.webSocketDebuggerUrl)
         return { state: "unknown", pages: targets.length };
     try {
-        const value = await evaluate(chat.webSocketDebuggerUrl, `(() => { const text = document.body?.innerText || ''; const hasComposer = !!document.querySelector('textarea, [contenteditable="true"]'); const login = /\\b(log in|sign in|登录|注册)\\b/i.test(text) && !hasComposer; return { login, hasComposer }; })()`);
+        const value = await evaluate(chat.webSocketDebuggerUrl, `(() => { const text = document.body?.innerText || ''; const hasComposer = Array.from(document.querySelectorAll('textarea, [contenteditable="true"]')).some((el) => { const style = getComputedStyle(el); return style.display !== "none" && style.visibility !== "hidden" && el instanceof HTMLElement && el.offsetParent !== null; }); const login = /\\b(log in|sign in|登录|注册)\\b/i.test(text) && !hasComposer; return { login, hasComposer }; })()`);
         const result = value;
         return { state: result.login ? "login_required" : result.hasComposer ? "ready" : "unknown", pages: targets.length };
     }
@@ -165,7 +165,7 @@ export async function sendChatGptPrompt(text, debugPort = 9222) {
         return { ok: false, code: "CHATGPT_PAGE_MISSING", message: "No ChatGPT page is open in the managed browser." };
     try {
         const result = await evaluate(target.webSocketDebuggerUrl, `(text => {
-      const composer = document.querySelector('textarea, [contenteditable="true"]');
+      const composer = Array.from(document.querySelectorAll('textarea, [contenteditable="true"]')).find((el) => { const style = getComputedStyle(el); return style.display !== "none" && style.visibility !== "hidden" && el instanceof HTMLElement && el.offsetParent !== null; });
       if (!composer) return { ok: false, code: "CHATGPT_LOGIN_REQUIRED", message: "ChatGPT is not ready for input; sign in first." };
       if (composer instanceof HTMLTextAreaElement) {
         const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
