@@ -205,7 +205,7 @@ async function assistantReply(debugPort) {
     const target = (await pages(debugPort)).find((page) => page.type === "page" && /chatgpt\.com|chat\.openai\.com/i.test(page.url ?? ""));
     if (!target?.webSocketDebuggerUrl)
         return { text: "" };
-    const value = await evaluate(target.webSocketDebuggerUrl, `(() => Array.from(document.querySelectorAll('[data-message-author-role="assistant"]')).map((n) => (n.textContent || '').trim()).filter(Boolean).pop() || '')()`);
+    const value = await evaluate(target.webSocketDebuggerUrl, `(() => Array.from(document.querySelectorAll('[data-message-author-role="assistant"]')).map((n) => (n.textContent || '').trim()).filter((text) => text && !/^(thinking|思考中|正在思考)(…|\.\.\.)?$/i.test(text)).pop() || '')()`);
     return { ws: target.webSocketDebuggerUrl, text: typeof value === "string" ? value : "" };
 }
 export async function askChatGpt(text, debugPort = 9222, timeoutMs = 120_000, onWait) {

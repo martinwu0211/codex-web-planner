@@ -1,4 +1,4 @@
-export const VERSION = "0.1.43";
+export const VERSION = "0.1.44";
 export const SERVICE_NAME = "c2c-bridge";
 export const PRODUCT_NAME = "Codex Web Planner";
 //# sourceMappingURL=version.js.map
