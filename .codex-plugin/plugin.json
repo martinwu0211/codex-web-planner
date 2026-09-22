@@ -1,6 +1,6 @@
 {
   "name": "codex-web-planner",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "description": "Let ChatGPT plan and review while Codex executes the approved work.",
   "author": {
     "name": "codex plus contributors"
@@ -13,6 +13,6 @@
     "developerName": "codex plus contributors",
     "category": "Productivity",
     "capabilities": [],
-    "defaultPrompt": "Use Codex Web Planner for this task: have ChatGPT produce a plan and review, then let Codex execute only the approved changes."
+    "defaultPrompt": "Use Codex Web Planner for this task. On first use, automatically check the ChatGPT connection and run setup; pause only for the user's ChatGPT login, CAPTCHA, 2FA, or final consent. Then have ChatGPT plan and review while Codex executes only approved changes."
   }
 }
