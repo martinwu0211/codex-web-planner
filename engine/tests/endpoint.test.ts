@@ -29,7 +29,7 @@ describe("connectorAction", () => {
 });
 
 describe("connectorNameFor", () => {
-  it("keeps a stored name for the same workspace", () => {
+  it("uses the short default name even when a stored name exists", () => {
     expect(
       connectorNameFor({
         workspaceName: "EchoMind",
@@ -40,7 +40,7 @@ describe("connectorNameFor", () => {
     ).toBe(DEFAULT_CONNECTOR_NAME);
   });
 
-  it("keeps the legacy title when this workspace was used before the name field existed", () => {
+  it("uses the short default name for a legacy workspace", () => {
     expect(
       connectorNameFor({
         workspaceName: "EchoMind",
@@ -50,14 +50,14 @@ describe("connectorNameFor", () => {
     ).toBe(DEFAULT_CONNECTOR_NAME);
   });
 
-  it("gives a new workspace its own connector title", () => {
+  it("uses the short default name for a new workspace", () => {
     expect(
       connectorNameFor({
         workspaceName: "Landing",
         workspaceId: "def456def456",
         hadEndpointBefore: false,
       })
-    ).toBe("Codex Web Planner · Landing");
+    ).toBe(DEFAULT_CONNECTOR_NAME);
   });
 });
 

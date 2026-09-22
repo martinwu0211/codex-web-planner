@@ -39,17 +39,9 @@ export function sanitizeConnectorLabel(name, workspaceId) {
     const cleaned = name.replace(/[^\p{L}\p{N}._\- ]+/gu, "").replace(/\s+/g, " ").trim();
     return cleaned.slice(0, 40) || workspaceId.slice(0, 6);
 }
-/**
- * Same workspace keeps one connector title forever.
- * A workspace already recorded without a title stays on the original
- * "Codex Web Planner" name. A new workspace gets a distinct title.
- */
+/** Keep the connector title short and identical across workspaces. */
 export function connectorNameFor(opts) {
-    if (opts.previousName?.trim())
-        return opts.previousName.trim();
-    if (opts.hadEndpointBefore)
-        return DEFAULT_CONNECTOR_NAME;
-    return `${DEFAULT_CONNECTOR_NAME} · ${sanitizeConnectorLabel(opts.workspaceName, opts.workspaceId)}`;
+    return DEFAULT_CONNECTOR_NAME;
 }
 export function reclaimUserMessage(connectorName) {
     return `当前项目的安全连接地址已经失效。我会删除「${connectorName}」再按新地址加回去，其它项目的连接不动。请稍等。`;

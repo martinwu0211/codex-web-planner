@@ -59,20 +59,14 @@ export function sanitizeConnectorLabel(name: string, workspaceId: string): strin
   return cleaned.slice(0, 40) || workspaceId.slice(0, 6);
 }
 
-/**
- * Same workspace keeps one connector title forever.
- * A workspace already recorded without a title stays on the original
- * "Codex Web Planner" name. A new workspace gets a distinct title.
- */
+/** Keep the connector title short and identical across workspaces. */
 export function connectorNameFor(opts: {
   workspaceName: string;
   workspaceId: string;
   previousName?: string | null;
   hadEndpointBefore: boolean;
 }): string {
-  if (opts.previousName?.trim()) return opts.previousName.trim();
-  if (opts.hadEndpointBefore) return DEFAULT_CONNECTOR_NAME;
-  return `${DEFAULT_CONNECTOR_NAME} · ${sanitizeConnectorLabel(opts.workspaceName, opts.workspaceId)}`;
+  return DEFAULT_CONNECTOR_NAME;
 }
 
 export function reclaimUserMessage(connectorName: string): string {
