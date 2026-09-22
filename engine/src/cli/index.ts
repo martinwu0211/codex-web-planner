@@ -59,6 +59,7 @@ import { saveExecutionOutput } from "../execution/output.js";
 import { readTokenUsage } from "../metrics/token-counter.js";
 import { readCodexUsage } from "../metrics/codex-usage.js";
 import { appendAudit, auditFile, readAuditTail } from "../audit/index.js";
+import { browserStatus, startBrowser, stopBrowser } from "../browser/supervisor.js";
 
 const program = new Command();
 
@@ -1332,6 +1333,25 @@ program
   );
 
 const tunnelCmd = program.command("tunnel").description("Choose or inspect the public connection for this workspace");
+
+const browserCmd = program.command("browser").description("Manage the visible ChatGPT browser used by Chat mode");
+for (const [name, action] of [["status", "status"], ["start", "start"], ["stop", "stop"]] as const) {
+  browserCmd.command(name).option("--port <port>", "Chrome DevTools port", "9222").option("--json", "machine-readable output", false)
+    .action(async (opts: { port: string; json: boolean }) => {
+      try {
+        const port = Number(opts.port);
+        if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("port must be a valid TCP port");
+        const result = action === "start" ? await startBrowser(port) : action === "stop" ? await stopBrowser(port) : await browserStatus(port);
+        if (opts.json) say(JSON.stringify({ ok: result.state !== "missing", ...result }));
+        else {
+          say(`Browser：${result.state}`);
+          say(`Executable：${result.executable ?? "missing"}`);
+          say(`Profile：${result.profileDir}`);
+          if (result.state !== "running") say(`Next：${result.loginHint}`);
+        }
+      } catch (error) { handleCliError(error, opts.json); }
+    });
+}
 
 tunnelCmd
   .command("status", { isDefault: true })
