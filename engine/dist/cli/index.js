@@ -24,6 +24,7 @@ import { saveExecutionOutput } from "../execution/output.js";
 import { readTokenUsage } from "../metrics/token-counter.js";
 import { readCodexUsage } from "../metrics/codex-usage.js";
 import { appendAudit, auditFile, readAuditTail } from "../audit/index.js";
+import { plannerStatus, reviewExecution, startPlanning } from "../orchestrator/task.js";
 import { askChatGpt, browserStatus, sendChatGptPrompt, startBrowser, stopBrowser } from "../browser/supervisor.js";
 const program = new Command();
 const say = (msg) => {
@@ -1270,6 +1271,41 @@ browserCmd.command("ask").requiredOption("--text <text>", "prompt to send to Cha
         handleCliError(error, opts.json);
     }
 });
+const plannerCmd = program.command("planner").description("Run the ChatGPT planning and review loop");
+plannerCmd.command("status").option("--json", "machine-readable output", false).action((opts) => {
+    const task = plannerStatus();
+    if (opts.json)
+        say(JSON.stringify({ ok: true, task }));
+    else
+        say(task ? `${task.taskId} · ${task.phase} · ${task.updatedAt}` : "No planner task is active.");
+});
+plannerCmd.command("start").requiredOption("--goal <goal>", "task goal").option("--timeout <seconds>", "ChatGPT timeout", "120").option("--json", "machine-readable output", false)
+    .action(async (opts) => { try {
+    const result = await startPlanning(opts.goal, Number(opts.timeout) * 1000);
+    if (opts.json)
+        say(JSON.stringify(result));
+    else {
+        say(`${result.ok ? "✓" : "✗"} ${result.code}: ${result.message}`);
+        say(JSON.stringify(result.task, null, 2));
+    }
+}
+catch (error) {
+    handleCliError(error, opts.json);
+} });
+plannerCmd.command("review").requiredOption("--result <text>", "Codex execution result").option("--timeout <seconds>", "ChatGPT timeout", "120").option("--json", "machine-readable output", false)
+    .action(async (opts) => { try {
+    const result = await reviewExecution(opts.result, Number(opts.timeout) * 1000);
+    if (opts.json)
+        say(JSON.stringify(result));
+    else {
+        say(`${result.ok ? "✓" : "✗"} ${result.code}: ${result.message}`);
+        if (result.task)
+            say(JSON.stringify(result.task, null, 2));
+    }
+}
+catch (error) {
+    handleCliError(error, opts.json);
+} });
 tunnelCmd
     .command("status", { isDefault: true })
     .description("Show whether this workspace still needs a one-time connection choice")
