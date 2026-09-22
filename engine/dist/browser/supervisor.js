@@ -60,7 +60,10 @@ async function openConnectorPage(debugPort) {
             await evaluate(existing.webSocketDebuggerUrl, `location.href = ${JSON.stringify(url)}`);
             await new Promise((resolve) => setTimeout(resolve, 800));
         }
-        return existing;
+        // Navigation can replace the renderer's CDP session. Re-read /json/list
+        // instead of reusing the pre-navigation WebSocket URL.
+        const refreshed = (await pages(debugPort)).find((page) => page.type === "page" && /chatgpt\.com|chat\.openai\.com/i.test(page.url ?? ""));
+        return refreshed ?? existing;
     }
     try {
         const response = await fetch(`http://127.0.0.1:${debugPort}/json/new?${encodeURIComponent(url)}`, { method: "PUT" });
