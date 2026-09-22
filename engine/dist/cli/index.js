@@ -54,10 +54,12 @@ function usageDisplay(usage, enabled) {
 function mergedUsageDisplay(usage, enabled) {
     const local = usageDisplay(usage, enabled);
     const codex = readCodexUsage();
+    const usedTokens = codex.totalTokens ?? local.usedTokens;
     return {
         ...local,
         actual: codex,
-        usedTokens: codex.totalTokens ?? local.usedTokens,
+        usedTokens,
+        savedTokens: local.baselineTokens === null ? null : Math.max(0, local.baselineTokens - usedTokens),
         usageSource: codex.totalTokens === null ? "local-estimate" : "codex-session",
         fiveHourRemaining: codex.fiveHourRemaining ?? local.fiveHourRemaining,
         weeklyRemaining: codex.weeklyRemaining ?? local.weeklyRemaining,
