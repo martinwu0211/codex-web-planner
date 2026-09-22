@@ -34,15 +34,92 @@ async function reachable(port) {
         return false;
     }
 }
+async function pages(debugPort) {
+    try {
+        return await (await fetch(`http://127.0.0.1:${debugPort}/json/list`)).json();
+    }
+    catch {
+        return [];
+    }
+}
+async function evaluate(wsUrl, expression) {
+    return await new Promise((resolve, reject) => {
+        const socket = new WebSocket(wsUrl);
+        const id = Math.floor(Math.random() * 1_000_000_000);
+        const timer = setTimeout(() => { try {
+            socket.close();
+        }
+        catch { } reject(new Error("CDP evaluation timed out")); }, 3000);
+        socket.addEventListener("open", () => socket.send(JSON.stringify({ id, method: "Runtime.evaluate", params: { expression, returnByValue: true } })));
+        socket.addEventListener("message", (event) => {
+            try {
+                const message = JSON.parse(String(event.data));
+                if (message.id !== id)
+                    return;
+                clearTimeout(timer);
+                socket.close();
+                if (message.error)
+                    reject(new Error("CDP evaluation failed"));
+                else
+                    resolve(message.result?.result?.value);
+            }
+            catch { /* ignore unrelated messages */ }
+        });
+        socket.addEventListener("error", () => { clearTimeout(timer); reject(new Error("CDP websocket unavailable")); });
+    });
+}
+async function chatgptState(debugPort) {
+    const targets = (await pages(debugPort)).filter((page) => page.type === "page");
+    const chat = targets.find((page) => /chatgpt\.com|chat\.openai\.com/i.test(page.url ?? ""));
+    if (!chat)
+        return { state: "absent", pages: targets.length };
+    if (!chat.webSocketDebuggerUrl)
+        return { state: "unknown", pages: targets.length };
+    try {
+        const value = await evaluate(chat.webSocketDebuggerUrl, `(() => { const text = document.body?.innerText || ''; const hasComposer = !!document.querySelector('textarea, [contenteditable="true"]'); const login = /\\b(log in|sign in|登录|注册)\\b/i.test(text) && !hasComposer; return { login, hasComposer }; })()`);
+        const result = value;
+        return { state: result.login ? "login_required" : result.hasComposer ? "ready" : "unknown", pages: targets.length };
+    }
+    catch {
+        return { state: "unknown", pages: targets.length };
+    }
+}
+export async function sendChatGptPrompt(text, debugPort = 9222) {
+    const target = (await pages(debugPort)).find((page) => page.type === "page" && /chatgpt\.com|chat\.openai\.com/i.test(page.url ?? ""));
+    if (!target?.webSocketDebuggerUrl)
+        return { ok: false, code: "CHATGPT_PAGE_MISSING", message: "No ChatGPT page is open in the managed browser." };
+    try {
+        const result = await evaluate(target.webSocketDebuggerUrl, `(text => {
+      const composer = document.querySelector('textarea, [contenteditable="true"]');
+      if (!composer) return { ok: false, code: "CHATGPT_LOGIN_REQUIRED", message: "ChatGPT is not ready for input; sign in first." };
+      if (composer instanceof HTMLTextAreaElement) {
+        const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+        setter?.call(composer, text);
+      } else { composer.textContent = text; }
+      composer.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
+      const buttons = Array.from(document.querySelectorAll('button'));
+      const send = buttons.find((b) => /send|发送|submit/i.test(b.getAttribute('aria-label') || b.textContent || '') && !(b as HTMLButtonElement).disabled);
+      if (!send) return { ok: false, code: "CHATGPT_SEND_BUTTON_MISSING", message: "ChatGPT composer found but the send button was not detected." };
+      (send as HTMLElement).click();
+      return { ok: true, code: "CHATGPT_PROMPT_SENT", message: "Prompt sent to ChatGPT." };
+    })(${JSON.stringify(text)})`);
+        return result;
+    }
+    catch {
+        return { ok: false, code: "CHATGPT_BROWSER_ERROR", message: "The managed ChatGPT page did not accept the prompt." };
+    }
+}
 export async function browserStatus(debugPort = 9222) {
     const executable = findExecutable();
     const runtime = readRuntime();
     if (!executable)
-        return { state: "missing", executable: null, pid: null, debugPort, profileDir: profileDir(), loginHint: "Install Chromium or set CODEX_WEB_PLANNER_BROWSER." };
+        return { state: "missing", executable: null, pid: null, debugPort, profileDir: profileDir(), loginHint: "Install Chromium or set CODEX_WEB_PLANNER_BROWSER.", chatgpt: "absent", pages: 0 };
     const live = await reachable(debugPort);
-    if (live)
-        return { state: "running", executable, pid: runtime.pid ?? null, debugPort, profileDir: profileDir(), loginHint: "Open ChatGPT in the visible browser and sign in if required." };
-    return { state: runtime.pid && processExists(runtime.pid) ? "unreachable" : "stopped", executable, pid: runtime.pid ?? null, debugPort, profileDir: profileDir(), loginHint: "The browser will open ChatGPT after start." };
+    if (live) {
+        const chat = await chatgptState(debugPort);
+        return { state: "running", executable, pid: runtime.pid ?? null, debugPort, profileDir: profileDir(), loginHint: chat.state === "login_required" ? "Sign in to ChatGPT in the visible browser." : "ChatGPT browser is ready.", chatgpt: chat.state, pages: chat.pages };
+    }
+    return { state: runtime.pid && processExists(runtime.pid) ? "unreachable" : "stopped", executable, pid: runtime.pid ?? null, debugPort, profileDir: profileDir(), loginHint: "The browser will open ChatGPT after start.", chatgpt: "absent", pages: 0 };
 }
 function processExists(pid) { try {
     process.kill(pid, 0);
@@ -84,6 +161,6 @@ export async function stopBrowser(debugPort = 9222) {
         fs.unlinkSync(runtimeFile());
     }
     catch { /* no runtime file */ }
-    return { ...current, state: "stopped", pid: null };
+    return { ...current, state: "stopped", pid: null, chatgpt: "absent", pages: 0 };
 }
 //# sourceMappingURL=supervisor.js.map

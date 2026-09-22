@@ -59,7 +59,7 @@ import { saveExecutionOutput } from "../execution/output.js";
 import { readTokenUsage } from "../metrics/token-counter.js";
 import { readCodexUsage } from "../metrics/codex-usage.js";
 import { appendAudit, auditFile, readAuditTail } from "../audit/index.js";
-import { browserStatus, startBrowser, stopBrowser } from "../browser/supervisor.js";
+import { browserStatus, sendChatGptPrompt, startBrowser, stopBrowser } from "../browser/supervisor.js";
 
 const program = new Command();
 
@@ -1347,11 +1347,19 @@ for (const [name, action] of [["status", "status"], ["start", "start"], ["stop",
           say(`Browser：${result.state}`);
           say(`Executable：${result.executable ?? "missing"}`);
           say(`Profile：${result.profileDir}`);
+          say(`ChatGPT：${result.chatgpt} · Pages：${result.pages}`);
           if (result.state !== "running") say(`Next：${result.loginHint}`);
         }
       } catch (error) { handleCliError(error, opts.json); }
     });
 }
+browserCmd.command("prompt").requiredOption("--text <text>", "prompt to send to ChatGPT").option("--port <port>", "Chrome DevTools port", "9222").option("--json", "machine-readable output", false)
+  .action(async (opts: { text: string; port: string; json: boolean }) => {
+    try {
+      const result = await sendChatGptPrompt(opts.text, Number(opts.port));
+      if (opts.json) say(JSON.stringify(result)); else say(`${result.ok ? "✓" : "✗"} ${result.code}: ${result.message}`);
+    } catch (error) { handleCliError(error, opts.json); }
+  });
 
 tunnelCmd
   .command("status", { isDefault: true })
