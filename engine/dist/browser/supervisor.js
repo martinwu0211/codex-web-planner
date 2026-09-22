@@ -173,9 +173,9 @@ export async function sendChatGptPrompt(text, debugPort = 9222) {
       } else { composer.textContent = text; }
       composer.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
       const buttons = Array.from(document.querySelectorAll('button'));
-      const send = buttons.find((b) => /send|发送|submit/i.test(b.getAttribute('aria-label') || b.textContent || '') && !(b as HTMLButtonElement).disabled);
+      const send = buttons.find((b) => /send|发送|submit/i.test(b.getAttribute('aria-label') || b.textContent || '') && !b.disabled);
       if (!send) return { ok: false, code: "CHATGPT_SEND_BUTTON_MISSING", message: "ChatGPT composer found but the send button was not detected." };
-      (send as HTMLElement).click();
+      send.click();
       return { ok: true, code: "CHATGPT_PROMPT_SENT", message: "Prompt sent to ChatGPT." };
     })(${JSON.stringify(text)})`);
         return result;

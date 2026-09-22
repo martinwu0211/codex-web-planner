@@ -28,11 +28,22 @@ export async function startPlanning(goal, timeoutMs = 120_000, mode = "auto", on
     saveTask(task);
     if (mode === "codex")
         return { task, ok: true, code: "CODEX_NATIVE_MODE", message: "ChatGPT is disabled; continue with native Codex execution." };
-    await startBrowser();
-    let result = await askChatGpt(`You are the planning and review brain for Codex Web Planner.\nTask ID: ${task.taskId}\nGoal: ${goal}\nReturn ONLY JSON in this schema: {"steps":[{"id":"step-1","action":"...","verification":"..."}],"risks":["..."],"verification":["..."]}. Do not edit files.`, 9222, timeoutMs, onWait);
-    if (!result.ok && mode === "auto") {
+    let result;
+    try {
         await startBrowser();
-        result = await askChatGpt(`Retry planning for task ${task.taskId}. Goal: ${goal}. Return only the required JSON plan schema.`, 9222, timeoutMs, onWait);
+        result = await askChatGpt(`You are the planning and review brain for Codex Web Planner.\nTask ID: ${task.taskId}\nGoal: ${goal}\nReturn ONLY JSON in this schema: {"steps":[{"id":"step-1","action":"...","verification":"..."}],"risks":["..."],"verification":["..."]}. Do not edit files.`, 9222, timeoutMs, onWait);
+    }
+    catch (error) {
+        result = { ok: false, code: "CHATGPT_BROWSER_ERROR", message: error instanceof Error ? error.message : String(error) };
+    }
+    if (!result.ok && mode === "auto") {
+        try {
+            await startBrowser();
+            result = await askChatGpt(`Retry planning for task ${task.taskId}. Goal: ${goal}. Return only the required JSON plan schema.`, 9222, timeoutMs, onWait);
+        }
+        catch (error) {
+            result = { ok: false, code: "CHATGPT_BROWSER_ERROR", message: error instanceof Error ? error.message : String(error) };
+        }
     }
     if (!result.ok) {
         if (mode === "auto")
