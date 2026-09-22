@@ -173,12 +173,29 @@ export async function sendChatGptPrompt(text, debugPort = 9222) {
       } else { composer.textContent = text; }
       composer.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
       const buttons = Array.from(document.querySelectorAll('button'));
-      const send = buttons.find((b) => /send|发送|submit/i.test(b.getAttribute('aria-label') || b.textContent || '') && !b.disabled);
+      const send = buttons.find((b) => /send|发送|submit/i.test(b.getAttribute('aria-label') || b.getAttribute('data-testid') || b.textContent || '') && !b.disabled);
       if (!send) return { ok: false, code: "CHATGPT_SEND_BUTTON_MISSING", message: "ChatGPT composer found but the send button was not detected." };
       send.click();
       return { ok: true, code: "CHATGPT_PROMPT_SENT", message: "Prompt sent to ChatGPT." };
     })(${JSON.stringify(text)})`);
-        return result;
+        const first = result;
+        if (first.ok || first.code !== "CHATGPT_SEND_BUTTON_MISSING")
+            return first;
+        // ChatGPT renders the send button asynchronously after the input event.
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+            await new Promise((resolve) => setTimeout(resolve, 250));
+            const retry = await evaluate(target.webSocketDebuggerUrl, `(() => {
+        const buttons = Array.from(document.querySelectorAll('button'));
+        const send = buttons.find((b) => /send|发送|submit/i.test(b.getAttribute('aria-label') || b.getAttribute('data-testid') || b.textContent || '') && !b.disabled);
+        if (!send) return { ok: false, code: "CHATGPT_SEND_BUTTON_MISSING", message: "ChatGPT composer found but the send button was not detected." };
+        send.click();
+        return { ok: true, code: "CHATGPT_PROMPT_SENT", message: "Prompt sent to ChatGPT." };
+      })()`);
+            const checked = retry;
+            if (checked.ok)
+                return checked;
+        }
+        return first;
     }
     catch {
         return { ok: false, code: "CHATGPT_BROWSER_ERROR", message: "The managed ChatGPT page did not accept the prompt." };
