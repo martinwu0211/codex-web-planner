@@ -64,8 +64,10 @@ async function openConnectorPage(debugPort: number): Promise<DevtoolsPage | null
   const existing = targets.find((page) => page.type === "page" && /chatgpt\.com|chat\.openai\.com/i.test(page.url ?? ""));
   const url = "https://chatgpt.com/plugins#settings/Connectors?create-connector=true&redirectAfter=%2Fplugins";
   if (existing) {
-    if (existing.webSocketDebuggerUrl) {
-      await evaluate(existing.webSocketDebuggerUrl, `location.href = ${JSON.stringify(url)}`);
+    const alreadyOnForm = /chatgpt\.com\/plugins#settings\/Connectors/i.test(existing.url ?? "");
+    if (!alreadyOnForm && existing.webSocketDebuggerUrl) {
+      // Navigation may close the old CDP socket before it can return a value.
+      try { await evaluate(existing.webSocketDebuggerUrl, `location.href = ${JSON.stringify(url)}`); } catch { /* expected during navigation */ }
       await new Promise((resolve) => setTimeout(resolve, 800));
     }
     // Navigation can replace the renderer's CDP session. Re-read /json/list
@@ -101,9 +103,9 @@ export async function configureChatGptConnector(name: string, mcpUrl: string, de
       const oauth = document.querySelector('input[type="radio"][value*="oauth" i], input[type="radio"][id*="oauth" i]');
       if (oauth instanceof HTMLInputElement && !oauth.checked) oauth.click();
       if (!payload.submit) return { ok: nameOk && urlOk, code: nameOk && urlOk ? 'CHATGPT_CONNECTOR_FIELDS_FILLED' : 'CHATGPT_CONNECTOR_FORM_NOT_READY', message: nameOk && urlOk ? 'Connector name and MCP URL filled; pairing code remains for the user.' : 'Connector form fields were not found.' };
-      const button = Array.from(document.querySelectorAll('button')).find(b => /^(create|save|创建|保存)$/i.test((b.textContent || '').trim()) && !(b as HTMLButtonElement).disabled);
+      const button = Array.from(document.querySelectorAll('button')).find(b => /^(create|save|创建|保存)$/i.test((b.textContent || '').trim()) && !b.disabled);
       if (!button) return { ok: false, code: 'CHATGPT_CONNECTOR_CREATE_BUTTON_MISSING', message: 'Connector fields are filled, but the Create button is not ready.' };
-      (button as HTMLElement).click();
+      button.click();
       return { ok: nameOk && urlOk, code: nameOk && urlOk ? 'CHATGPT_CONNECTOR_CREATED' : 'CHATGPT_CONNECTOR_FORM_NOT_READY', message: nameOk && urlOk ? 'Connector created; pairing code remains for the user.' : 'Connector form fields were not found.' };
     })(${JSON.stringify({ name, url: mcpUrl, submit })})`) as { ok: boolean; code: string; message: string };
       last = result;
