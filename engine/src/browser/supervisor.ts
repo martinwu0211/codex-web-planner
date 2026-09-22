@@ -200,7 +200,7 @@ export async function askChatGpt(text: string, debugPort = 9222, timeoutMs = 120
     const elapsed = Date.now() - startedAt;
     if (onWait && elapsed - lastHeartbeat >= 30_000) { lastHeartbeat = elapsed; onWait(elapsed); }
     const current = await assistantReply(debugPort);
-    if (current.count > before.count && current.text && current.text !== before.text) {
+    if (current.text && current.text !== before.text && (current.count > before.count || elapsed >= 3000)) {
       if (current.text === last) { if (!stableSince) stableSince = Date.now(); if (Date.now() - stableSince >= 1500) return { ok: true, code: "CHATGPT_RESPONSE_RECEIVED", message: "ChatGPT returned a new response.", response: current.text }; }
       else { last = current.text; stableSince = 0; }
     }

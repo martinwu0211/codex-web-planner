@@ -227,7 +227,7 @@ export async function askChatGpt(text, debugPort = 9222, timeoutMs = 120_000, on
             onWait(elapsed);
         }
         const current = await assistantReply(debugPort);
-        if (current.count > before.count && current.text && current.text !== before.text) {
+        if (current.text && current.text !== before.text && (current.count > before.count || elapsed >= 3000)) {
             if (current.text === last) {
                 if (!stableSince)
                     stableSince = Date.now();
