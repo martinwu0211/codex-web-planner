@@ -23,16 +23,16 @@ function parsePlan(text) {
         return null;
     }
 }
-export async function startPlanning(goal, timeoutMs = 120_000, mode = "auto") {
+export async function startPlanning(goal, timeoutMs = 120_000, mode = "auto", onWait) {
     const task = { taskId: crypto.randomUUID(), goal, mode, phase: mode === "codex" ? "executing" : "planning", updatedAt: new Date().toISOString() };
     saveTask(task);
     if (mode === "codex")
         return { task, ok: true, code: "CODEX_NATIVE_MODE", message: "ChatGPT is disabled; continue with native Codex execution." };
     await startBrowser();
-    let result = await askChatGpt(`You are the planning and review brain for Codex Web Planner.\nTask ID: ${task.taskId}\nGoal: ${goal}\nReturn ONLY JSON in this schema: {"steps":[{"id":"step-1","action":"...","verification":"..."}],"risks":["..."],"verification":["..."]}. Do not edit files.`, 9222, timeoutMs);
+    let result = await askChatGpt(`You are the planning and review brain for Codex Web Planner.\nTask ID: ${task.taskId}\nGoal: ${goal}\nReturn ONLY JSON in this schema: {"steps":[{"id":"step-1","action":"...","verification":"..."}],"risks":["..."],"verification":["..."]}. Do not edit files.`, 9222, timeoutMs, onWait);
     if (!result.ok && mode === "auto") {
         await startBrowser();
-        result = await askChatGpt(`Retry planning for task ${task.taskId}. Goal: ${goal}. Return only the required JSON plan schema.`, 9222, timeoutMs);
+        result = await askChatGpt(`Retry planning for task ${task.taskId}. Goal: ${goal}. Return only the required JSON plan schema.`, 9222, timeoutMs, onWait);
     }
     if (!result.ok) {
         if (mode === "auto")

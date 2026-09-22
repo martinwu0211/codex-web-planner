@@ -23,13 +23,13 @@ function parsePlan(text: string): { steps: PlanStep[]; risks: string[]; verifica
   } catch { return null; }
 }
 
-export async function startPlanning(goal: string, timeoutMs = 120_000, mode: PlannerTask["mode"] = "auto"): Promise<{ task: PlannerTask; ok: boolean; code: string; message: string }> {
+export async function startPlanning(goal: string, timeoutMs = 120_000, mode: PlannerTask["mode"] = "auto", onWait?: (elapsedMs: number) => void): Promise<{ task: PlannerTask; ok: boolean; code: string; message: string }> {
   const task: PlannerTask = { taskId: crypto.randomUUID(), goal, mode, phase: mode === "codex" ? "executing" : "planning", updatedAt: new Date().toISOString() };
   saveTask(task);
   if (mode === "codex") return { task, ok: true, code: "CODEX_NATIVE_MODE", message: "ChatGPT is disabled; continue with native Codex execution." };
   await startBrowser();
-  let result = await askChatGpt(`You are the planning and review brain for Codex Web Planner.\nTask ID: ${task.taskId}\nGoal: ${goal}\nReturn ONLY JSON in this schema: {"steps":[{"id":"step-1","action":"...","verification":"..."}],"risks":["..."],"verification":["..."]}. Do not edit files.`, 9222, timeoutMs);
-  if (!result.ok && mode === "auto") { await startBrowser(); result = await askChatGpt(`Retry planning for task ${task.taskId}. Goal: ${goal}. Return only the required JSON plan schema.`, 9222, timeoutMs); }
+  let result = await askChatGpt(`You are the planning and review brain for Codex Web Planner.\nTask ID: ${task.taskId}\nGoal: ${goal}\nReturn ONLY JSON in this schema: {"steps":[{"id":"step-1","action":"...","verification":"..."}],"risks":["..."],"verification":["..."]}. Do not edit files.`, 9222, timeoutMs, onWait);
+  if (!result.ok && mode === "auto") { await startBrowser(); result = await askChatGpt(`Retry planning for task ${task.taskId}. Goal: ${goal}. Return only the required JSON plan schema.`, 9222, timeoutMs, onWait); }
   if (!result.ok) {
     if (mode === "auto") return { task: saveTask({ ...task, phase: "executing", mode: "codex", fallbackReason: `${result.code}: ${result.message}`, updatedAt: new Date().toISOString() }), ok: true, code: "FALLBACK_CODEX", message: `ChatGPT unavailable; automatically switched to native Codex execution (${result.code}).` };
     return { task: saveTask({ ...task, phase: "blocked", updatedAt: new Date().toISOString() }), ...result };

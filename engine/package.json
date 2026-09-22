@@ -1,6 +1,6 @@
 {
   "name": "codex-web-planner-engine",
-  "version": "0.1.34",
+  "version": "0.1.35",
   "description": "ChatGPT thinks. Codex works. Use ChatGPT as the planning brain while keeping the Codex harness.",
   "type": "module",
   "license": "MIT",

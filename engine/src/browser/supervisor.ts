@@ -113,15 +113,19 @@ async function assistantReply(debugPort: number): Promise<{ ws?: string; text: s
   return { ws: target.webSocketDebuggerUrl, text: typeof value === "string" ? value : "" };
 }
 
-export async function askChatGpt(text: string, debugPort = 9222, timeoutMs = 120_000): Promise<{ ok: boolean; code: string; message: string; response?: string }> {
+export async function askChatGpt(text: string, debugPort = 9222, timeoutMs = 120_000, onWait?: (elapsedMs: number) => void): Promise<{ ok: boolean; code: string; message: string; response?: string }> {
   const before = await assistantReply(debugPort);
   const sent = await sendChatGptPrompt(text, debugPort);
   if (!sent.ok) return sent;
   const deadline = Date.now() + Math.max(1000, timeoutMs);
   let last = before.text;
   let stableSince = 0;
+  let lastHeartbeat = 0;
+  const startedAt = Date.now();
   while (Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 1000));
+    const elapsed = Date.now() - startedAt;
+    if (onWait && elapsed - lastHeartbeat >= 30_000) { lastHeartbeat = elapsed; onWait(elapsed); }
     const current = await assistantReply(debugPort);
     if (current.text && current.text !== before.text) {
       if (current.text === last) { if (!stableSince) stableSince = Date.now(); if (Date.now() - stableSince >= 1500) return { ok: true, code: "CHATGPT_RESPONSE_RECEIVED", message: "ChatGPT returned a new response.", response: current.text }; }

@@ -11,6 +11,22 @@ Use this skill when the user asks to plan, review, or execute a coding task with
 
 This skill is the complete onboarding prompt. When the plugin is installed, execute this flow automatically; the user must not paste another setup prompt or run `c2c` manually. Resolve the bundled engine, install production dependencies, read the saved work mode, reuse a configured CDP browser when present, otherwise start the managed Chromium browser, open ChatGPT, and continue setup. Stop only for ChatGPT login, CAPTCHA, 2FA, or final consent, then resume automatically after the user completes that action.
 
+## Agent self-repair and visible progress
+
+Use the installed plugin as an agent workflow, not as a blind script. At the beginning of every task, announce a short stage such as `[1/5] checking plugin`, `[2/5] checking browser`, or `[3/5] waiting for ChatGPT login`. While waiting for login, consent, or an assistant response, emit a visible heartbeat at least every 30 seconds. If the user asks what they need to do during a wait, report the current stage, exact required action, and that the task will resume automatically; do not restart setup or create a second task.
+
+When a step fails, inspect and repair it before asking the user. The canonical repair paths are:
+
+- bundled CLI: `engine/bin/c2c.js` (run it with Node when `c2c` is unavailable);
+- plugin engine dependencies: the installed plugin's `engine/` directory and its package manifest;
+- persistent state: `${CODEX_STATE_DIR}/browser/`, `${CODEX_STATE_DIR}/orchestrator/`, and `${CODEX_STATE_DIR}/sessions/` (use the resolved Codex state directory, never invent a second one);
+- managed browser profile: `${CODEX_STATE_DIR}/browser/profile/`;
+- browser control: `c2c browser status`, `c2c browser start`, and `c2c browser ask`;
+- planner loop: `c2c planner status`, `c2c planner start`, and `c2c planner review`;
+- Bridge diagnosis: `c2c status --json` followed by the reported `diagnostic.nextAction`.
+
+Self-repair rules: install missing bundled dependencies, restart a stale Bridge, reuse the existing CDP browser before launching another one, remove only stale runtime files after confirming the process is gone, retry one time after a browser or connector failure, and then switch to native Codex mode in `auto`. Never loop indefinitely, delete the user's browser profile to fix a login problem, claim a local MCP call was a ChatGPT call, or request credentials. Include the exact path and command being repaired in progress output so another Agent can continue from the same state.
+
 0. Read the saved work mode before each task. In `auto`, prefer Chat mode when the browser and ChatGPT connector are available, and fall back to native Codex execution on any browser, login, connector, or timeout failure. In `chat`, run `node engine/bin/c2c.js browser start` before setup, then `node engine/bin/c2c.js planner start --goal <goal>` to persist a task and wait for a real ChatGPT plan; after Codex executes, run `node engine/bin/c2c.js planner review --result <summary>` and continue fixing until the review passes. In `codex`, do not start a browser or wait for ChatGPT. Never report Chat mode as active unless a real MCP exchange has been observed.
 
 1. Treat the first ordinary user task after installation as an end-to-end onboarding task. Before asking the user anything, run the bundled status check; if this workspace is not authorized, automatically start setup and continue through dependency installation, Developer mode, connector creation, pairing, and verification. The user should only need to handle ChatGPT login, CAPTCHA, 2FA, or final consent. A request such as “install the plugin at `<GitHub URL>`” is also an end-to-end onboarding task: resolve the repository/plugin name, use Codex's plugin marketplace/add commands, verify the installed version, and report progress as `[1/5]` through `[5/5]`. Do not ask the user to clone a repository, paste a long setup prompt, or install npm dependencies manually; only stop for Codex's normal approval prompt or a ChatGPT account authorization step.

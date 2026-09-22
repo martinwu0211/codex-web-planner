@@ -125,7 +125,7 @@ async function assistantReply(debugPort) {
     const value = await evaluate(target.webSocketDebuggerUrl, `(() => Array.from(document.querySelectorAll('[data-message-author-role="assistant"]')).map((n) => (n.textContent || '').trim()).filter(Boolean).pop() || '')()`);
     return { ws: target.webSocketDebuggerUrl, text: typeof value === "string" ? value : "" };
 }
-export async function askChatGpt(text, debugPort = 9222, timeoutMs = 120_000) {
+export async function askChatGpt(text, debugPort = 9222, timeoutMs = 120_000, onWait) {
     const before = await assistantReply(debugPort);
     const sent = await sendChatGptPrompt(text, debugPort);
     if (!sent.ok)
@@ -133,8 +133,15 @@ export async function askChatGpt(text, debugPort = 9222, timeoutMs = 120_000) {
     const deadline = Date.now() + Math.max(1000, timeoutMs);
     let last = before.text;
     let stableSince = 0;
+    let lastHeartbeat = 0;
+    const startedAt = Date.now();
     while (Date.now() < deadline) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
+        const elapsed = Date.now() - startedAt;
+        if (onWait && elapsed - lastHeartbeat >= 30_000) {
+            lastHeartbeat = elapsed;
+            onWait(elapsed);
+        }
         const current = await assistantReply(debugPort);
         if (current.text && current.text !== before.text) {
             if (current.text === last) {

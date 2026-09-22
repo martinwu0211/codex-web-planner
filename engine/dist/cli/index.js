@@ -1283,7 +1283,9 @@ plannerCmd.command("start").requiredOption("--goal <goal>", "task goal").option(
     .action(async (opts) => { try {
     if (!["auto", "chat", "codex"].includes(opts.mode))
         throw new Error("mode must be auto, chat, or codex");
-    const result = await startPlanning(opts.goal, Number(opts.timeout) * 1000, opts.mode);
+    const heartbeat = (elapsedMs) => { if (!opts.json)
+        say(`… waiting for ChatGPT response (${Math.floor(elapsedMs / 1000)}s elapsed); the task will resume automatically`); };
+    const result = await startPlanning(opts.goal, Number(opts.timeout) * 1000, opts.mode, heartbeat);
     if (opts.json)
         say(JSON.stringify(result));
     else {
