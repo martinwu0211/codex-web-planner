@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { ensureDir, getStateDir } from "../config/paths.js";
 import { findBridgeObservation, findLiveBridge, probeBridge, readRuntimeState, type RuntimeState } from "../bridge/runtime.js";
 import { Workspace } from "../workspace/manager.js";
+import { VERSION } from "../version.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -32,7 +33,17 @@ export interface EnsureBridgeResult {
 export async function ensureBridge(workspaceRoot: string, opts: { port?: number } = {}): Promise<EnsureBridgeResult> {
   const workspace = new Workspace(workspaceRoot);
   const observation = await findBridgeObservation(workspace.id);
-  if (observation.state === "healthy") return { runtime: observation.runtime, spawned: false };
+  if (observation.state === "healthy" && observation.runtime.version === VERSION) {
+    return { runtime: observation.runtime, spawned: false };
+  }
+  if (observation.state === "healthy" && observation.runtime.version !== VERSION) {
+    // A plugin upgrade can leave the previous detached bridge alive. Reusing it
+    // mixes CLI/bridge versions and makes new skills appear stuck or report
+    // stale connection state. Stop the old workspace bridge and spawn this
+    // bundled version before continuing.
+    await stopBridge(workspace.root);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
   if (observation.state === "unknown") {
     throw new Error(
       `Bridge state is uncertain (${observation.reason}); refusing to start another bridge.`
