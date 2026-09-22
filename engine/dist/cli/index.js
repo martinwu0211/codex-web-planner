@@ -24,7 +24,7 @@ import { saveExecutionOutput } from "../execution/output.js";
 import { readTokenUsage } from "../metrics/token-counter.js";
 import { readCodexUsage } from "../metrics/codex-usage.js";
 import { appendAudit, auditFile, readAuditTail } from "../audit/index.js";
-import { browserStatus, sendChatGptPrompt, startBrowser, stopBrowser } from "../browser/supervisor.js";
+import { askChatGpt, browserStatus, sendChatGptPrompt, startBrowser, stopBrowser } from "../browser/supervisor.js";
 const program = new Command();
 const say = (msg) => {
     process.stdout.write(msg + "\n");
@@ -1246,6 +1246,25 @@ browserCmd.command("prompt").requiredOption("--text <text>", "prompt to send to 
             say(JSON.stringify(result));
         else
             say(`${result.ok ? "✓" : "✗"} ${result.code}: ${result.message}`);
+    }
+    catch (error) {
+        handleCliError(error, opts.json);
+    }
+});
+browserCmd.command("ask").requiredOption("--text <text>", "prompt to send to ChatGPT").option("--port <port>", "Chrome DevTools port", "9222").option("--timeout <seconds>", "response timeout", "120").option("--json", "machine-readable output", false)
+    .action(async (opts) => {
+    try {
+        const timeout = Number(opts.timeout) * 1000;
+        if (!Number.isFinite(timeout) || timeout < 1000)
+            throw new Error("timeout must be at least one second");
+        const result = await askChatGpt(opts.text, Number(opts.port), timeout);
+        if (opts.json)
+            say(JSON.stringify(result));
+        else {
+            say(`${result.ok ? "✓" : "✗"} ${result.code}: ${result.message}`);
+            if (result.response)
+                say(result.response);
+        }
     }
     catch (error) {
         handleCliError(error, opts.json);

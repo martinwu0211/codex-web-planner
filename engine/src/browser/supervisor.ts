@@ -98,6 +98,31 @@ export async function sendChatGptPrompt(text: string, debugPort = 9222): Promise
   } catch { return { ok: false, code: "CHATGPT_BROWSER_ERROR", message: "The managed ChatGPT page did not accept the prompt." }; }
 }
 
+async function assistantReply(debugPort: number): Promise<{ ws?: string; text: string }> {
+  const target = (await pages(debugPort)).find((page) => page.type === "page" && /chatgpt\.com|chat\.openai\.com/i.test(page.url ?? ""));
+  if (!target?.webSocketDebuggerUrl) return { text: "" };
+  const value = await evaluate(target.webSocketDebuggerUrl, `(() => Array.from(document.querySelectorAll('[data-message-author-role="assistant"]')).map((n) => (n.textContent || '').trim()).filter(Boolean).pop() || '')()`);
+  return { ws: target.webSocketDebuggerUrl, text: typeof value === "string" ? value : "" };
+}
+
+export async function askChatGpt(text: string, debugPort = 9222, timeoutMs = 120_000): Promise<{ ok: boolean; code: string; message: string; response?: string }> {
+  const before = await assistantReply(debugPort);
+  const sent = await sendChatGptPrompt(text, debugPort);
+  if (!sent.ok) return sent;
+  const deadline = Date.now() + Math.max(1000, timeoutMs);
+  let last = before.text;
+  let stableSince = 0;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const current = await assistantReply(debugPort);
+    if (current.text && current.text !== before.text) {
+      if (current.text === last) { if (!stableSince) stableSince = Date.now(); if (Date.now() - stableSince >= 1500) return { ok: true, code: "CHATGPT_RESPONSE_RECEIVED", message: "ChatGPT returned a new response.", response: current.text }; }
+      else { last = current.text; stableSince = 0; }
+    }
+  }
+  return { ok: false, code: "CHATGPT_RESPONSE_TIMEOUT", message: "ChatGPT did not return a new response before the timeout." };
+}
+
 export async function browserStatus(debugPort = 9222): Promise<BrowserStatus> {
   const executable = findExecutable();
   const runtime = readRuntime();
