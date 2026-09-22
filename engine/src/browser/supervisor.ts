@@ -178,11 +178,12 @@ export async function sendChatGptPrompt(text: string, debugPort = 9222): Promise
   } catch { return { ok: false, code: "CHATGPT_BROWSER_ERROR", message: "The managed ChatGPT page did not accept the prompt." }; }
 }
 
-async function assistantReply(debugPort: number): Promise<{ ws?: string; text: string }> {
+async function assistantReply(debugPort: number): Promise<{ ws?: string; text: string; count: number }> {
   const target = (await pages(debugPort)).find((page) => page.type === "page" && /chatgpt\.com|chat\.openai\.com/i.test(page.url ?? ""));
-  if (!target?.webSocketDebuggerUrl) return { text: "" };
-  const value = await evaluate(target.webSocketDebuggerUrl, `(() => Array.from(document.querySelectorAll('[data-message-author-role="assistant"]')).map((n) => (n.textContent || '').trim()).filter((text) => text && !/^(thinking|思考中|正在思考)(…|\.\.\.)?$/i.test(text)).pop() || '')()`);
-  return { ws: target.webSocketDebuggerUrl, text: typeof value === "string" ? value : "" };
+  if (!target?.webSocketDebuggerUrl) return { text: "", count: 0 };
+  const value = await evaluate(target.webSocketDebuggerUrl, `(() => { const nodes = Array.from(document.querySelectorAll('[data-message-author-role="assistant"]')); const text = nodes.map((n) => (n.textContent || '').trim()).filter((text) => text && !/^(thinking|思考中|正在思考)(…|\.\.\.)?$/i.test(text)).pop() || ''; return { text, count: nodes.length }; })()`);
+  const result = value as { text?: unknown; count?: unknown };
+  return { ws: target.webSocketDebuggerUrl, text: typeof result.text === "string" ? result.text : "", count: typeof result.count === "number" ? result.count : 0 };
 }
 
 export async function askChatGpt(text: string, debugPort = 9222, timeoutMs = 120_000, onWait?: (elapsedMs: number) => void): Promise<{ ok: boolean; code: string; message: string; response?: string }> {
@@ -199,7 +200,7 @@ export async function askChatGpt(text: string, debugPort = 9222, timeoutMs = 120
     const elapsed = Date.now() - startedAt;
     if (onWait && elapsed - lastHeartbeat >= 30_000) { lastHeartbeat = elapsed; onWait(elapsed); }
     const current = await assistantReply(debugPort);
-    if (current.text && current.text !== before.text) {
+    if (current.count > before.count && current.text && current.text !== before.text) {
       if (current.text === last) { if (!stableSince) stableSince = Date.now(); if (Date.now() - stableSince >= 1500) return { ok: true, code: "CHATGPT_RESPONSE_RECEIVED", message: "ChatGPT returned a new response.", response: current.text }; }
       else { last = current.text; stableSince = 0; }
     }
