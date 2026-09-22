@@ -17,13 +17,23 @@ if (!runtimeReady()) {
   const installer = process.env.npm_execpath
     ? [process.execPath, process.env.npm_execpath]
     : ["npx", "--yes", "pnpm@11.24.0"];
-  const result = spawnSync(installer[0], [...installer.slice(1), "install", "--prod", "--frozen-lockfile"], {
-    cwd: engineRoot,
-    stdio: "inherit",
-    env: { ...process.env, CI: "true" },
-  });
+  let result;
+  try {
+    result = spawnSync(installer[0], [...installer.slice(1), "install", "--prod", "--frozen-lockfile"], {
+      cwd: engineRoot,
+      stdio: "inherit",
+      env: { ...process.env, CI: "true" },
+      timeout: 120_000,
+    });
+  } catch (error) {
+    process.stderr.write(`codex-web-planner: CWP_DEPENDENCY_SETUP_FAILED (${error instanceof Error ? error.message : String(error)})\n`);
+    process.stderr.write("Next action: check network access, then rerun the plugin setup; no task was started.\n");
+    process.exit(1);
+  }
   if (result.status !== 0 || !runtimeReady()) {
-    process.stderr.write("codex-web-planner: dependency setup failed; rerun the plugin setup from Codex.\n");
+    const reason = result.signal === "SIGTERM" ? "CWP_DEPENDENCY_SETUP_TIMEOUT" : "CWP_DEPENDENCY_SETUP_FAILED";
+    process.stderr.write(`codex-web-planner: ${reason}; dependency setup did not finish.\n`);
+    process.stderr.write("Next action: check network access or cached dependencies, then rerun the plugin setup; no task was started.\n");
     process.exit(result.status ?? 1);
   }
 }

@@ -19,11 +19,6 @@ Use this skill when the user asks to plan, review, or execute a coding task with
 7. Execute edits, commands, tests, and commits in Codex after the user approves the plan.
 8. Return the review result and any remaining decision to the user.
    Treat `diagnostic.code`, `diagnostic.message`, and `diagnostic.nextAction` as the source of truth for connection errors. Explain the error in one sentence, execute the suggested local command when it is safe, and re-check status. Do not repeatedly ask the user to retry the same step.
-2. Keep workspace access read-only for ChatGPT. Do not upload the repository as an archive.
-3. Send only compact control messages between Codex and ChatGPT. Let ChatGPT read the required files through MCP.
-4. Execute edits, commands, tests, and commits in Codex after the user approves the plan.
-5. Return the review result and any remaining decision to the user.
-
 ## Connection confirmation
 
 This is a public plugin. Prefer Codex's built-in in-app browser for ChatGPT setup; it is the supported automatic path and never requires noVNC, a VPS browser, Chrome CDP, a pre-authenticated browser profile, or access to the user's cookies. If the built-in browser is unavailable, use the guided manual fallback. Never use an external browser silently.

@@ -41,6 +41,20 @@ function sessionFile(sessionId: string): string | null {
   return matches.length === 1 ? matches[0] : null;
 }
 
+/** Read only the tail so a large historical rollout cannot exhaust the CLI's memory. */
+function readTailLines(file: string, maxBytes = 1_048_576): string[] {
+  const handle = fs.openSync(file, "r");
+  try {
+    const size = fs.fstatSync(handle).size;
+    const length = Math.min(size, maxBytes);
+    const buffer = Buffer.alloc(length);
+    fs.readSync(handle, buffer, 0, length, size - length);
+    return buffer.toString("utf8").split("\n").slice(-2000).reverse();
+  } finally {
+    fs.closeSync(handle);
+  }
+}
+
 function remaining(window: JsonRecord | undefined): string | null {
   const used = number(window?.used_percent);
   if (used === null || used < 0 || used > 100) return null;
@@ -55,8 +69,7 @@ export function readCodexUsage(): CodexUsageView {
   if (!file) return { available: false, sessionId, inputTokens: null, outputTokens: null, totalTokens: null, fiveHourRemaining: null, weeklyRemaining: null, reason: "找不到当前会话记录" };
   let lines: string[];
   try {
-    const raw = fs.readFileSync(file, "utf8");
-    lines = raw.split("\n").slice(-2000).reverse();
+    lines = readTailLines(file);
   } catch {
     return { available: false, sessionId, inputTokens: null, outputTokens: null, totalTokens: null, fiveHourRemaining: null, weeklyRemaining: null, reason: "无法读取当前会话记录" };
   }
