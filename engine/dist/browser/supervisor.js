@@ -51,6 +51,57 @@ async function openChatGptPage(debugPort) {
     }
     catch { /* browser may not support remote page creation */ }
 }
+async function openConnectorPage(debugPort) {
+    const targets = await pages(debugPort);
+    const existing = targets.find((page) => page.type === "page" && /chatgpt\.com|chat\.openai\.com/i.test(page.url ?? ""));
+    const url = "https://chatgpt.com/plugins#settings/Connectors?create-connector=true&redirectAfter=%2Fplugins";
+    if (existing) {
+        if (existing.webSocketDebuggerUrl) {
+            await evaluate(existing.webSocketDebuggerUrl, `location.href = ${JSON.stringify(url)}`);
+            await new Promise((resolve) => setTimeout(resolve, 800));
+        }
+        return existing;
+    }
+    try {
+        const response = await fetch(`http://127.0.0.1:${debugPort}/json/new?${encodeURIComponent(url)}`, { method: "PUT" });
+        return response.ok ? await response.json() : null;
+    }
+    catch {
+        return null;
+    }
+}
+/** Fill the ChatGPT custom connector form. Pairing remains a visible user step. */
+export async function configureChatGptConnector(name, mcpUrl, debugPort = 9222, submit = true) {
+    const target = await openConnectorPage(debugPort);
+    if (!target?.webSocketDebuggerUrl)
+        return { ok: false, code: "CHATGPT_CONNECTOR_PAGE_MISSING", message: "ChatGPT connector form is not open." };
+    try {
+        const result = await evaluate(target.webSocketDebuggerUrl, `(payload => {
+      const setValue = (selector, value) => {
+        const el = document.querySelector(selector);
+        if (!el) return false;
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+        setter?.call(el, value);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+      };
+      const nameOk = setValue('#custom-connector-name, input[name="name"]', payload.name);
+      const urlOk = setValue('#custom-connector-url, input[name="url"]', payload.url);
+      const oauth = document.querySelector('input[type="radio"][value*="oauth" i], input[type="radio"][id*="oauth" i]');
+      if (oauth instanceof HTMLInputElement && !oauth.checked) oauth.click();
+      if (!payload.submit) return { ok: nameOk && urlOk, code: nameOk && urlOk ? 'CHATGPT_CONNECTOR_FIELDS_FILLED' : 'CHATGPT_CONNECTOR_FORM_NOT_READY', message: nameOk && urlOk ? 'Connector name and MCP URL filled; pairing code remains for the user.' : 'Connector form fields were not found.' };
+      const button = Array.from(document.querySelectorAll('button')).find(b => /^(create|save|创建|保存)$/i.test((b.textContent || '').trim()) && !(b as HTMLButtonElement).disabled);
+      if (!button) return { ok: false, code: 'CHATGPT_CONNECTOR_CREATE_BUTTON_MISSING', message: 'Connector fields are filled, but the Create button is not ready.' };
+      (button as HTMLElement).click();
+      return { ok: nameOk && urlOk, code: nameOk && urlOk ? 'CHATGPT_CONNECTOR_CREATED' : 'CHATGPT_CONNECTOR_FORM_NOT_READY', message: nameOk && urlOk ? 'Connector created; pairing code remains for the user.' : 'Connector form fields were not found.' };
+    })(${JSON.stringify({ name, url: mcpUrl, submit })})`);
+        return result;
+    }
+    catch {
+        return { ok: false, code: "CHATGPT_CONNECTOR_BROWSER_ERROR", message: "ChatGPT connector form did not accept the fields." };
+    }
+}
 async function evaluate(wsUrl, expression) {
     return await new Promise((resolve, reject) => {
         const socket = new WebSocket(wsUrl);

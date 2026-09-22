@@ -25,7 +25,7 @@ import { readTokenUsage } from "../metrics/token-counter.js";
 import { readCodexUsage } from "../metrics/codex-usage.js";
 import { appendAudit, auditFile, readAuditTail } from "../audit/index.js";
 import { plannerStatus, reviewExecution, startPlanning } from "../orchestrator/task.js";
-import { askChatGpt, browserStatus, sendChatGptPrompt, startBrowser, stopBrowser } from "../browser/supervisor.js";
+import { askChatGpt, browserStatus, configureChatGptConnector, sendChatGptPrompt, startBrowser, stopBrowser } from "../browser/supervisor.js";
 const program = new Command();
 const say = (msg) => {
     process.stdout.write(msg + "\n");
@@ -1266,6 +1266,20 @@ browserCmd.command("ask").requiredOption("--text <text>", "prompt to send to Cha
             if (result.response)
                 say(result.response);
         }
+    }
+    catch (error) {
+        handleCliError(error, opts.json);
+    }
+});
+browserCmd.command("connector").requiredOption("--name <name>", "connector name").requiredOption("--mcp-url <url>", "current MCP URL").option("--port <port>", "Chrome DevTools port", "9222").option("--no-submit", "fill fields but leave Create for the user").option("--json", "machine-readable output", false)
+    .description("Open ChatGPT's connector form and fill the current name and MCP URL; pairing is still a visible user step")
+    .action(async (opts) => {
+    try {
+        const result = await configureChatGptConnector(opts.name, opts.mcpUrl, Number(opts.port), opts.submit);
+        if (opts.json)
+            say(JSON.stringify(result));
+        else
+            say(`${result.ok ? "✓" : "✗"} ${result.code}: ${result.message}`);
     }
     catch (error) {
         handleCliError(error, opts.json);
