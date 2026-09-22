@@ -4,17 +4,33 @@ import { askChatGpt } from "../browser/supervisor.js";
 import { getStateDir, readJsonIfExists, writeSecureJson, ensureDir } from "../config/paths.js";
 
 export type TaskPhase = "planning" | "executing" | "reviewing" | "done" | "blocked";
-export interface PlannerTask { taskId: string; goal: string; phase: TaskPhase; plan?: string; review?: string; updatedAt: string; }
+export interface PlanStep { id: string; action: string; verification?: string; }
+export interface PlannerTask { taskId: string; goal: string; phase: TaskPhase; plan?: string; steps?: PlanStep[]; risks?: string[]; verification?: string[]; review?: string; updatedAt: string; }
 const taskFile = () => path.join(getStateDir(), "orchestrator", "task.json");
 const readTask = () => readJsonIfExists<PlannerTask>(taskFile());
 const saveTask = (task: PlannerTask) => { ensureDir(path.dirname(taskFile())); writeSecureJson(taskFile(), task); return task; };
+function parsePlan(text: string): { steps: PlanStep[]; risks: string[]; verification: string[] } | null {
+  const match = text.match(/```(?:json)?\s*([\s\S]*?)```/) ?? text.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  try {
+    const raw = JSON.parse(match[1] ?? match[0]) as { steps?: unknown; risks?: unknown; verification?: unknown };
+    if (!Array.isArray(raw.steps) || raw.steps.length === 0) return null;
+    const steps = raw.steps.map((step, index) => {
+      const item = step as { id?: unknown; action?: unknown; verification?: unknown };
+      return { id: String(item.id ?? `step-${index + 1}`), action: String(item.action ?? ""), verification: item.verification ? String(item.verification) : undefined };
+    }).filter((step) => step.action.trim());
+    return { steps, risks: Array.isArray(raw.risks) ? raw.risks.map(String) : [], verification: Array.isArray(raw.verification) ? raw.verification.map(String) : [] };
+  } catch { return null; }
+}
 
 export async function startPlanning(goal: string, timeoutMs = 120_000): Promise<{ task: PlannerTask; ok: boolean; code: string; message: string }> {
   const task: PlannerTask = { taskId: crypto.randomUUID(), goal, phase: "planning", updatedAt: new Date().toISOString() };
   saveTask(task);
-  const result = await askChatGpt(`You are the planning and review brain for Codex Web Planner.\nTask ID: ${task.taskId}\nGoal: ${goal}\nReturn a concise implementation plan with risks and verification steps. Do not edit files.`, 9222, timeoutMs);
+  const result = await askChatGpt(`You are the planning and review brain for Codex Web Planner.\nTask ID: ${task.taskId}\nGoal: ${goal}\nReturn ONLY JSON in this schema: {"steps":[{"id":"step-1","action":"...","verification":"..."}],"risks":["..."],"verification":["..."]}. Do not edit files.`, 9222, timeoutMs);
   if (!result.ok) return { task: saveTask({ ...task, phase: "blocked", updatedAt: new Date().toISOString() }), ...result };
-  const next = saveTask({ ...task, phase: "executing", plan: result.response, updatedAt: new Date().toISOString() });
+  const parsed = parsePlan(result.response ?? "");
+  if (!parsed) return { task: saveTask({ ...task, phase: "blocked", plan: result.response, updatedAt: new Date().toISOString() }), ok: false, code: "PLAN_PARSE_FAILED", message: "ChatGPT returned a response that does not match the required plan schema." };
+  const next = saveTask({ ...task, phase: "executing", plan: result.response, ...parsed, updatedAt: new Date().toISOString() });
   return { task: next, ok: true, code: result.code, message: result.message };
 }
 
