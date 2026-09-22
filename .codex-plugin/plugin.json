@@ -1,6 +1,6 @@
 {
   "name": "codex-web-planner",
-  "version": "0.1.33",
+  "version": "0.1.34",
   "description": "Let ChatGPT plan and review while Codex executes the approved work.",
   "author": {
     "name": "codex plus contributors"
@@ -13,6 +13,6 @@
     "developerName": "codex plus contributors",
     "category": "Productivity",
     "capabilities": [],
-    "defaultPrompt": "Use Codex Web Planner for this task. On first use, automatically check the ChatGPT connection and run setup; pause only for the user's ChatGPT login, CAPTCHA, 2FA, or final consent. Then have ChatGPT plan and review while Codex executes only approved changes."
+    "defaultPrompt": "Use Codex Web Planner for this task. Automatically install and configure the latest bundled dependencies, detect or start the managed browser, reuse an existing CDP browser when available, check ChatGPT login and connector state, and continue through setup without asking the user to run shell commands. Pause only for ChatGPT login, CAPTCHA, 2FA, or final consent. In auto mode, use ChatGPT for planning and review, execute changes in Codex, and fall back to native Codex mode on browser, connector, or timeout failure. Never claim success from a local MCP substitute."
   }
 }

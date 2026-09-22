@@ -1,3 +1,3 @@
-export const VERSION = "0.1.33";
+export const VERSION = "0.1.34";
 export const SERVICE_NAME = "c2c-bridge";
 export const PRODUCT_NAME = "Codex Web Planner";
