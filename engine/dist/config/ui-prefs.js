@@ -1,6 +1,7 @@
 import path from "node:path";
 import { getStateDir, readJsonIfExists, writeSecureJson } from "./paths.js";
 export const SETUP_MODES = ["auto", "manual"];
+export const WORK_MODES = ["auto", "chat", "codex"];
 /** Shown once, before the first ChatGPT connection on this machine. */
 export const SETUP_CHOICE_PROMPT = [
     "首次连接 ChatGPT 前，请选择一种配置方式（选一次即可，之后默认沿用）：",
@@ -25,10 +26,12 @@ function readStored() {
     if (!raw || typeof raw !== "object")
         return null;
     const setupMode = raw.setupMode === "auto" || raw.setupMode === "manual" ? raw.setupMode : undefined;
+    const workMode = raw.workMode === "auto" || raw.workMode === "chat" || raw.workMode === "codex" ? raw.workMode : undefined;
     return {
         developerModeEnabled: raw.developerModeEnabled === true,
         tokenMetricsEnabled: raw.tokenMetricsEnabled !== false,
         setupMode,
+        workMode,
         updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : new Date().toISOString(),
     };
 }
@@ -36,10 +39,12 @@ export function readUiPrefs() {
     const stored = readStored();
     const developerModeEnabled = stored?.developerModeEnabled === true;
     const setupMode = stored?.setupMode ?? null;
+    const workMode = stored?.workMode ?? "auto";
     return {
         developerModeEnabled,
         tokenMetricsEnabled: stored?.tokenMetricsEnabled !== false,
         setupMode,
+        workMode,
         setupChoicePrompt: SETUP_CHOICE_PROMPT,
         remembered: {
             developerMode: developerModeEnabled,
@@ -53,6 +58,7 @@ export function mergeUiPrefs(patch) {
     }
     const previous = readStored();
     const setupMode = patch.setupMode ?? previous?.setupMode;
+    const workMode = patch.workMode ?? previous?.workMode;
     const stored = {
         updatedAt: new Date().toISOString(),
     };
@@ -67,6 +73,8 @@ export function mergeUiPrefs(patch) {
         stored.tokenMetricsEnabled = previous.tokenMetricsEnabled;
     if (setupMode)
         stored.setupMode = setupMode;
+    if (workMode)
+        stored.workMode = workMode;
     writeSecureJson(prefsFile(), stored);
     return readUiPrefs();
 }

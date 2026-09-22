@@ -15,7 +15,7 @@ import { isNamedTunnelReady, NAMED_LOGIN_PROMPT, NAMED_REPAIR_MESSAGE, needsTunn
 import { Logger } from "../logger/index.js";
 import { getStateDir } from "../config/paths.js";
 import { ensureSandboxAllowlist, getCodexConfigPath, isStateDirAllowlisted } from "../config/sandbox-allow.js";
-import { mergeUiPrefs, readUiPrefs, SETUP_MODES } from "../config/ui-prefs.js";
+import { mergeUiPrefs, readUiPrefs, SETUP_MODES, WORK_MODES } from "../config/ui-prefs.js";
 import { CHATGPT_CREATE_CONNECTOR_URL, CHATGPT_DEVELOPER_MODE_URL, CHATGPT_PLUGINS_URL, connectorAction, connectorNameFor, mcpUrlFromPublic, normalizePublicUrl, readLastEndpoint, reclaimUserMessage, writeLastEndpoint, } from "../config/endpoint.js";
 import { PRODUCT_NAME, VERSION } from "../version.js";
 import { clearChatPointer, mergeSession, readSession, resolveConversation, writeSession, PROTOCOL_STATES, WAITING_FOR, } from "../session/state.js";
@@ -1109,6 +1109,7 @@ acceptUnusedWorkspaceOption(prefsCmd
         say("配置方式：手动教学配置");
     else
         say("配置方式：尚未选择");
+    say(`工作模式：${prefs.workMode === "chat" ? "Chat（省流）" : prefs.workMode === "codex" ? "Codex 原生" : "自动（优先 Chat，失败回退 Codex）"}`);
     say(`MCP 计数：${prefs.tokenMetricsEnabled ? "已开启" : "已关闭"}`);
 });
 acceptUnusedWorkspaceOption(prefsCmd
@@ -1116,6 +1117,7 @@ acceptUnusedWorkspaceOption(prefsCmd
     .description("Save a ChatGPT setup choice for this machine")
     .option("--developer-mode", "remember that ChatGPT developer mode is on", false)
     .option("--setup-mode <mode>", "auto (preview) or manual")
+    .option("--work-mode <mode>", "auto, chat, or codex")
     .option("--token-metrics <state>", "on or off")
     .option("--json", "machine-readable output", false))
     .action((opts) => {
@@ -1124,15 +1126,19 @@ acceptUnusedWorkspaceOption(prefsCmd
         if (modeRaw && !SETUP_MODES.includes(modeRaw)) {
             throw new Error(`setup-mode must be one of ${SETUP_MODES.join(", ")}`);
         }
+        const workModeRaw = opts.workMode?.trim().toLowerCase();
+        if (workModeRaw && !WORK_MODES.includes(workModeRaw))
+            throw new Error(`work-mode must be one of ${WORK_MODES.join(", ")}`);
         const metricsRaw = opts.tokenMetrics?.trim().toLowerCase();
         if (metricsRaw && metricsRaw !== "on" && metricsRaw !== "off")
             throw new Error("token-metrics must be on or off");
-        if (!opts.developerMode && !modeRaw && !metricsRaw) {
-            throw new Error("nothing to save: pass --developer-mode, --setup-mode, and/or --token-metrics");
+        if (!opts.developerMode && !modeRaw && !workModeRaw && !metricsRaw) {
+            throw new Error("nothing to save: pass --developer-mode, --setup-mode, --work-mode, and/or --token-metrics");
         }
         const prefs = mergeUiPrefs({
             developerModeEnabled: opts.developerMode ? true : undefined,
             setupMode: modeRaw,
+            workMode: workModeRaw,
             tokenMetricsEnabled: metricsRaw ? metricsRaw === "on" : undefined,
         });
         if (opts.json) {
@@ -1145,6 +1151,8 @@ acceptUnusedWorkspaceOption(prefsCmd
             check("已记住配置方式：AI 自动化配置（预览版）");
         if (modeRaw === "manual")
             check("已记住配置方式：手动教学配置");
+        if (workModeRaw)
+            check(`工作模式：${workModeRaw}`);
         if (metricsRaw)
             check(`MCP 计数：${metricsRaw === "on" ? "已开启" : "已关闭"}`);
     }

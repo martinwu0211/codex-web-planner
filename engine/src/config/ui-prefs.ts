@@ -2,8 +2,10 @@ import path from "node:path";
 import { getStateDir, readJsonIfExists, writeSecureJson } from "./paths.js";
 
 export type SetupMode = "auto" | "manual";
+export type WorkMode = "auto" | "chat" | "codex";
 
 export const SETUP_MODES: readonly SetupMode[] = ["auto", "manual"];
+export const WORK_MODES: readonly WorkMode[] = ["auto", "chat", "codex"];
 
 /** Shown once, before the first ChatGPT connection on this machine. */
 export const SETUP_CHOICE_PROMPT = [
@@ -26,6 +28,7 @@ interface StoredUiPrefs {
   developerModeEnabled?: boolean;
   tokenMetricsEnabled?: boolean;
   setupMode?: SetupMode;
+  workMode?: WorkMode;
   updatedAt: string;
 }
 
@@ -33,6 +36,7 @@ export interface UiPrefsView {
   developerModeEnabled: boolean;
   tokenMetricsEnabled: boolean;
   setupMode: SetupMode | null;
+  workMode: WorkMode;
   setupChoicePrompt: string;
   remembered: {
     developerMode: boolean;
@@ -48,10 +52,12 @@ function readStored(): StoredUiPrefs | null {
   const raw = readJsonIfExists<StoredUiPrefs>(prefsFile());
   if (!raw || typeof raw !== "object") return null;
   const setupMode = raw.setupMode === "auto" || raw.setupMode === "manual" ? raw.setupMode : undefined;
+  const workMode = raw.workMode === "auto" || raw.workMode === "chat" || raw.workMode === "codex" ? raw.workMode : undefined;
   return {
     developerModeEnabled: raw.developerModeEnabled === true,
     tokenMetricsEnabled: raw.tokenMetricsEnabled !== false,
     setupMode,
+    workMode,
     updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : new Date().toISOString(),
   };
 }
@@ -60,10 +66,12 @@ export function readUiPrefs(): UiPrefsView {
   const stored = readStored();
   const developerModeEnabled = stored?.developerModeEnabled === true;
   const setupMode = stored?.setupMode ?? null;
+  const workMode = stored?.workMode ?? "auto";
   return {
     developerModeEnabled,
     tokenMetricsEnabled: stored?.tokenMetricsEnabled !== false,
     setupMode,
+    workMode,
     setupChoicePrompt: SETUP_CHOICE_PROMPT,
     remembered: {
       developerMode: developerModeEnabled,
@@ -76,6 +84,7 @@ export interface UiPrefsPatch {
   developerModeEnabled?: true;
   tokenMetricsEnabled?: boolean;
   setupMode?: SetupMode;
+  workMode?: WorkMode;
 }
 
 export function mergeUiPrefs(patch: UiPrefsPatch): UiPrefsView {
@@ -84,6 +93,7 @@ export function mergeUiPrefs(patch: UiPrefsPatch): UiPrefsView {
   }
   const previous = readStored();
   const setupMode = patch.setupMode ?? previous?.setupMode;
+  const workMode = patch.workMode ?? previous?.workMode;
   const stored: StoredUiPrefs = {
     updatedAt: new Date().toISOString(),
   };
@@ -95,6 +105,7 @@ export function mergeUiPrefs(patch: UiPrefsPatch): UiPrefsView {
   if (patch.tokenMetricsEnabled !== undefined) stored.tokenMetricsEnabled = patch.tokenMetricsEnabled;
   else if (previous?.tokenMetricsEnabled !== undefined) stored.tokenMetricsEnabled = previous.tokenMetricsEnabled;
   if (setupMode) stored.setupMode = setupMode;
+  if (workMode) stored.workMode = workMode;
   writeSecureJson(prefsFile(), stored);
   return readUiPrefs();
 }
