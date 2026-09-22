@@ -76,7 +76,9 @@ export async function configureChatGptConnector(name, mcpUrl, debugPort = 9222, 
     if (!target?.webSocketDebuggerUrl)
         return { ok: false, code: "CHATGPT_CONNECTOR_PAGE_MISSING", message: "ChatGPT connector form is not open." };
     try {
-        const result = await evaluate(target.webSocketDebuggerUrl, `(payload => {
+        let last = { ok: false, code: "CHATGPT_CONNECTOR_FORM_NOT_READY", message: "Connector form is still loading." };
+        for (let attempt = 0; attempt < 12; attempt += 1) {
+            const result = await evaluate(target.webSocketDebuggerUrl, `(payload => {
       const setValue = (selector, value) => {
         const el = document.querySelector(selector);
         if (!el) return false;
@@ -96,7 +98,12 @@ export async function configureChatGptConnector(name, mcpUrl, debugPort = 9222, 
       (button as HTMLElement).click();
       return { ok: nameOk && urlOk, code: nameOk && urlOk ? 'CHATGPT_CONNECTOR_CREATED' : 'CHATGPT_CONNECTOR_FORM_NOT_READY', message: nameOk && urlOk ? 'Connector created; pairing code remains for the user.' : 'Connector form fields were not found.' };
     })(${JSON.stringify({ name, url: mcpUrl, submit })})`);
-        return result;
+            last = result;
+            if (result.ok || result.code !== "CHATGPT_CONNECTOR_FORM_NOT_READY")
+                return result;
+            await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+        return last;
     }
     catch {
         return { ok: false, code: "CHATGPT_CONNECTOR_BROWSER_ERROR", message: "ChatGPT connector form did not accept the fields." };

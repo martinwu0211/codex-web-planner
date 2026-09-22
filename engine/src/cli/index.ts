@@ -389,6 +389,8 @@ program
       check("Workspace Bridge 已启动");
       if (mcpUrl) check("安全连接已建立");
       say("");
+      say("[3/5] ChatGPT 连接器准备中");
+      say(`连接器名称：${connectorName}`);
       say("⚠️⚠️⚠️ 需要在 ChatGPT 网页完成一次授权 ⚠️⚠️⚠️");
       say(`ChatGPT 设置入口：${CHATGPT_CREATE_CONNECTOR_URL}`);
       say(`MCP 连接地址：${mcpUrl ?? `http://127.0.0.1:${runtime.port}/mcp`}`);
