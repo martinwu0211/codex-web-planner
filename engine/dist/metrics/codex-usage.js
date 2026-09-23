@@ -80,8 +80,10 @@ export function readCodexUsage() {
         const payload = asRecord(event.payload);
         if (!payload)
             continue;
+        // `usage` is the latest response; `thread_token_usage` is the cumulative
+        // current-session value used by the status footer. Prefer the latter.
         if (!usage && event.type === "token_usage_record")
-            usage = asRecord(payload.usage) ?? asRecord(payload.thread_token_usage);
+            usage = asRecord(payload.thread_token_usage) ?? asRecord(payload.usage);
         if (!limits) {
             const rate = asRecord(payload.rate_limits);
             if (rate)

@@ -1,5 +1,20 @@
 # Codex Web Planner
 
+## Work modes
+
+New installations start in **Codex** mode and do not connect to ChatGPT automatically.
+Ask Codex to connect GPT to enter **Auto** mode. A verified successful GPT response
+changes the saved mode to **Chat**. If a Chat call fails, the saved mode becomes
+**Auto**: Codex continues the current task locally and retries GPT on later tasks,
+with at most one repair/retry per task. Select **Codex** at any time to stop retries
+and work on other tasks. The saved mode is checked before setup, pairing, browser
+control, planning, and review; a pending response cannot undo a user switch to Codex.
+
+The plugin supports an available built-in browser or an existing user-authorized
+managed Chromium browser. Pairing grants workspace access; successful message
+exchange is verified separately before reporting Chat mode.
+
+
 ChatGPT plans and reviews. Codex executes.
 
 Codex Web Planner turns ChatGPT into the planning brain for a Codex coding session. ChatGPT reads the workspace through a read-only connection, produces a concrete plan, and reviews the result. Codex keeps control of edits, commands, tests, and commits.
@@ -74,7 +89,7 @@ MIT. See `LICENSE` and `THIRD_PARTY_NOTICES.md`.
 
 ### CLI status footer
 
-Every `c2c status`/`c2c usage` invocation shows the plugin state, Usage, saved-token estimate, and the `5h`/`1 week` quota fields. If ChatGPT is not authorized, the footer says `插件：未生效（ChatGPT 未连接）` and the diagnostic gives the exact repair command. Saved tokens require a trusted comparison baseline via `C2C_BASELINE_TOKENS`; quota values can be supplied by a trusted host integration with `C2C_QUOTA_5H` and `C2C_QUOTA_WEEK`.
+Every `c2c status`/`c2c usage` invocation shows the plugin state, Usage, a baseline delta, and the `5h`/`1 week` quota fields. The baseline delta is only a local arithmetic comparison and must not be described as actual token savings: total savings require a matched control/planner benchmark, including ChatGPT-side usage. If ChatGPT is not authorized, the footer says `插件：未生效（ChatGPT 未连接）` and the diagnostic gives the exact repair command. The baseline requires `C2C_BASELINE_TOKENS`; quota values can be supplied by a trusted host integration with `C2C_QUOTA_5H` and `C2C_QUOTA_WEEK`.
 
 ## Resident interactive session
 

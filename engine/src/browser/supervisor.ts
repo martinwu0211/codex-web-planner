@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { readUiPrefs, recordChatOutcome } from "../config/ui-prefs.js";
 import os from "node:os";
 import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -83,6 +84,7 @@ async function openConnectorPage(debugPort: number): Promise<DevtoolsPage | null
 
 /** Fill the ChatGPT custom connector form. Pairing remains a visible user step. */
 export async function configureChatGptConnector(name: string, mcpUrl: string, debugPort = 9222, submit = true): Promise<{ ok: boolean; code: string; message: string }> {
+  if (readUiPrefs().workMode === "codex") return { ok: false, code: "CODEX_MODE_ACTIVE", message: "ChatGPT is disabled in Codex mode." };
   const target = await openConnectorPage(debugPort);
   if (!target?.webSocketDebuggerUrl) return { ok: false, code: "CHATGPT_CONNECTOR_PAGE_MISSING", message: "ChatGPT connector form is not open." };
   try {
@@ -142,6 +144,7 @@ async function chatgptState(debugPort: number): Promise<{ state: BrowserStatus["
 }
 
 export async function sendChatGptPrompt(text: string, debugPort = 9222): Promise<{ ok: boolean; code: string; message: string }> {
+  if (readUiPrefs().workMode === "codex") return { ok: false, code: "CODEX_MODE_ACTIVE", message: "ChatGPT is disabled in Codex mode." };
   const target = (await pages(debugPort)).find((page) => page.type === "page" && /chatgpt\.com|chat\.openai\.com/i.test(page.url ?? ""));
   if (!target?.webSocketDebuggerUrl) return { ok: false, code: "CHATGPT_PAGE_MISSING", message: "No ChatGPT page is open in the managed browser." };
   try {
@@ -187,9 +190,10 @@ async function assistantReply(debugPort: number): Promise<{ ws?: string; text: s
 }
 
 export async function askChatGpt(text: string, debugPort = 9222, timeoutMs = 120_000, onWait?: (elapsedMs: number) => void): Promise<{ ok: boolean; code: string; message: string; response?: string }> {
+  if (readUiPrefs().workMode === "codex") return { ok: false, code: "CODEX_MODE_ACTIVE", message: "ChatGPT is disabled in Codex mode." };
   const before = await assistantReply(debugPort);
   const sent = await sendChatGptPrompt(text, debugPort);
-  if (!sent.ok) return sent;
+  if (!sent.ok) { recordChatOutcome(false); return sent; }
   const deadline = Date.now() + Math.max(1000, timeoutMs);
   let last = before.text;
   let stableSince = 0;
@@ -199,12 +203,14 @@ export async function askChatGpt(text: string, debugPort = 9222, timeoutMs = 120
     await new Promise((resolve) => setTimeout(resolve, 1000));
     const elapsed = Date.now() - startedAt;
     if (onWait && elapsed - lastHeartbeat >= 30_000) { lastHeartbeat = elapsed; onWait(elapsed); }
+    if (readUiPrefs().workMode === "codex") return { ok: false, code: "CODEX_MODE_ACTIVE", message: "ChatGPT wait cancelled by Codex mode." };
     const current = await assistantReply(debugPort);
     if (current.text && current.text !== before.text && (current.count > before.count || elapsed >= 3000)) {
-      if (current.text === last) { if (!stableSince) stableSince = Date.now(); if (Date.now() - stableSince >= 1500) return { ok: true, code: "CHATGPT_RESPONSE_RECEIVED", message: "ChatGPT returned a new response.", response: current.text }; }
+      if (current.text === last) { if (!stableSince) stableSince = Date.now(); if (Date.now() - stableSince >= 1500) { recordChatOutcome(true); return { ok: true, code: "CHATGPT_RESPONSE_RECEIVED", message: "ChatGPT returned a new response.", response: current.text }; } }
       else { last = current.text; stableSince = 0; }
     }
   }
+  recordChatOutcome(false);
   return { ok: false, code: "CHATGPT_RESPONSE_TIMEOUT", message: "ChatGPT did not return a new response before the timeout." };
 }
 
@@ -220,6 +226,7 @@ export async function browserStatus(debugPort = 9222): Promise<BrowserStatus> {
 function processExists(pid: number): boolean { try { process.kill(pid, 0); return true; } catch { return false; } }
 
 export async function startBrowser(debugPort = 9222): Promise<BrowserStatus> {
+  if (readUiPrefs().workMode === "codex") throw new Error("CODEX_MODE_ACTIVE: browser start disabled in Codex mode");
   const before = await browserStatus(debugPort);
   if (before.state === "running") { await openChatGptPage(debugPort); return browserStatus(debugPort); }
   if (!before.executable) return before;

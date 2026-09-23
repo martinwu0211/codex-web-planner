@@ -70,6 +70,22 @@ const say = (msg: string): void => {
 const check = (msg: string): void => say(`✓ ${msg}`);
 const cross = (msg: string): void => say(`✗ ${msg}`);
 
+// The saved mode gates connection side effects before any command action.
+program.hook("preAction", (_command, action) => {
+  if (readUiPrefs().workMode !== "codex") return;
+  const name = action.name();
+  const parent = action.parent?.name();
+  const blocked = parent === "browser" ? !["status", "stop"].includes(name)
+    : parent === "tunnel" ? !["status", "stop"].includes(name)
+    : parent === "c2c" && (["setup", "start", "restart", "serve", "pair", "wait-auth"].includes(name)
+      || (name === "doctor" && action.opts().fix !== false));
+  if (!blocked) return;
+  const result = { ok: false, code: "CODEX_MODE_ACTIVE", mode: "codex", message: "ChatGPT connection actions are disabled in Codex mode. Change the saved work mode explicitly before connecting." };
+  say(action.opts().json ? JSON.stringify(result) : result.message);
+  process.exit(1);
+});
+
+
 appendAudit({
   event: "cli.started",
   result: "pending",
@@ -524,7 +540,7 @@ program
         message: "本地 Bridge 没有运行，因此无法确认 ChatGPT 连接。",
         nextAction: "运行 c2c start，然后重新运行 c2c status。",
       };
-      if (opts.json) say(JSON.stringify({ ok: false, running: false, diagnostic }));
+      if (opts.json) say(JSON.stringify({ ok: false, running: false, workMode: readUiPrefs().workMode, diagnostic }));
       else {
         cross(`错误码：${diagnostic.code}；${diagnostic.message}`);
         say(`处理：${diagnostic.nextAction}`);
@@ -564,7 +580,7 @@ program
             nextAction: "运行 c2c setup，然后在 ChatGPT 连接器设置中添加地址并输入配对码。",
           };
     if (opts.json) {
-      say(JSON.stringify({ ok: true, running: true, ...info, chatgptConnection, diagnostic, tokenMetrics, usageSummary }));
+      say(JSON.stringify({ ok: true, running: true, ...info, workMode: readUiPrefs().workMode, chatgptConnection, diagnostic, tokenMetrics, usageSummary }));
       return;
     }
     say(PRODUCT_NAME);
@@ -573,6 +589,7 @@ program
     check(`Bridge：运行中（端口 ${info.port}）`);
     if (info.tunnel.running && info.tunnel.url) check(`安全连接：${info.tunnel.url}/mcp`);
     else say("· 安全连接：未启用（本地模式）");
+    say(`· Mode：${readUiPrefs().workMode}`);
     say(`· ChatGPT 授权：${chatgptConnection.authorized ? "已连接" : "未连接"}`);
     if (chatgptConnection.recentMcpExchange) say("· ChatGPT 通信：最近 10 分钟有响应");
     else if (chatgptConnection.lastMcpExchangeAt) say(`· ChatGPT 通信：上次响应 ${chatgptConnection.lastMcpExchangeAt}`);
@@ -584,7 +601,7 @@ program
     }
     say(`· 插件：${chatgptConnection.authorized ? "已生效" : "未生效（ChatGPT 未连接）"}`);
     say(`· Usage：${usageEnabled ? `${usage.requests} 次，估算 ${usageSummary.usedTokens} tokens` : "计数开关已关闭"}`);
-    say(`· 省下 token：${usageSummary.savedTokens === null ? "未设置基线，暂无法计算" : usageSummary.savedTokens}`);
+    say(`· 基线差值（不等于实际节省）：${usageSummary.savedTokens === null ? "未设置基线，暂无法计算" : usageSummary.savedTokens}`);
     say(`· 5h 剩余：${usageSummary.fiveHourRemaining === "unavailable" ? "暂不可读取" : usageSummary.fiveHourRemaining}`);
     say(`· 1 week 剩余：${usageSummary.weeklyRemaining === "unavailable" ? "暂不可读取" : usageSummary.weeklyRemaining}`);
   });
@@ -602,7 +619,7 @@ program
     say(enabled ? `Usage：${usage.requests} 次` : "Usage：计数开关已关闭");
     say(`输入：${usage.inputChars} 字符，输出：${usage.outputChars} 字符`);
     say(`估算 token：输入 ${usage.estimatedInputTokens}，输出 ${usage.estimatedOutputTokens}`);
-    say(`省下 token：${usageSummary.savedTokens === null ? "未设置基线，暂无法计算" : usageSummary.savedTokens}`);
+    say(`基线差值（不等于实际节省）：${usageSummary.savedTokens === null ? "未设置基线，暂无法计算" : usageSummary.savedTokens}`);
     say(`5h 剩余：${usageSummary.fiveHourRemaining === "unavailable" ? "暂不可读取" : usageSummary.fiveHourRemaining}`);
     say(`1 week 剩余：${usageSummary.weeklyRemaining === "unavailable" ? "暂不可读取" : usageSummary.weeklyRemaining}`);
   });
@@ -1388,8 +1405,8 @@ const plannerCmd = program.command("planner").description("Run the ChatGPT plann
 plannerCmd.command("status").option("--json", "machine-readable output", false).action((opts: { json: boolean }) => {
   const task = plannerStatus(); if (opts.json) say(JSON.stringify({ ok: true, task })); else say(task ? `${task.taskId} · ${task.phase} · ${task.updatedAt}` : "No planner task is active.");
 });
-plannerCmd.command("start").requiredOption("--goal <goal>", "task goal").option("--mode <mode>", "auto, chat, or codex", "auto").option("--timeout <seconds>", "ChatGPT timeout", "120").option("--json", "machine-readable output", false)
-  .action(async (opts: { goal: string; mode: string; timeout: string; json: boolean }) => { try { if (!["auto", "chat", "codex"].includes(opts.mode)) throw new Error("mode must be auto, chat, or codex"); const heartbeat = (elapsedMs: number) => { if (!opts.json) say(`… waiting for ChatGPT response (${Math.floor(elapsedMs / 1000)}s elapsed); the task will resume automatically`); }; const result = await startPlanning(opts.goal, Number(opts.timeout) * 1000, opts.mode as "auto" | "chat" | "codex", heartbeat); if (opts.json) say(JSON.stringify(result)); else { say(`${result.ok ? "✓" : "✗"} ${result.code}: ${result.message}`); say(JSON.stringify(result.task, null, 2)); } } catch (error) { handleCliError(error, opts.json); } });
+plannerCmd.command("start").requiredOption("--goal <goal>", "task goal").option("--mode <mode>", "auto, chat, or codex (defaults to saved work mode)").option("--timeout <seconds>", "ChatGPT timeout", "120").option("--json", "machine-readable output", false)
+  .action(async (opts: { goal: string; mode?: string; timeout: string; json: boolean }) => { try { if (opts.mode && !["auto", "chat", "codex"].includes(opts.mode)) throw new Error("mode must be auto, chat, or codex"); const heartbeat = (elapsedMs: number) => { if (!opts.json) say(`… waiting for ChatGPT response (${Math.floor(elapsedMs / 1000)}s elapsed); the task will resume automatically`); }; const result = await startPlanning(opts.goal, Number(opts.timeout) * 1000, opts.mode as "auto" | "chat" | "codex", heartbeat); if (opts.json) say(JSON.stringify(result)); else { say(`${result.ok ? "✓" : "✗"} ${result.code}: ${result.message}`); say(JSON.stringify(result.task, null, 2)); } } catch (error) { handleCliError(error, opts.json); } });
 plannerCmd.command("review").requiredOption("--result <text>", "Codex execution result").option("--timeout <seconds>", "ChatGPT timeout", "120").option("--json", "machine-readable output", false)
   .action(async (opts: { result: string; timeout: string; json: boolean }) => { try { const result = await reviewExecution(opts.result, Number(opts.timeout) * 1000); if (opts.json) say(JSON.stringify(result)); else { say(`${result.ok ? "✓" : "✗"} ${result.code}: ${result.message}`); if (result.task) say(JSON.stringify(result.task, null, 2)); } } catch (error) { handleCliError(error, opts.json); } });
 

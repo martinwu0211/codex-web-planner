@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import os from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -7,6 +8,29 @@ import { spawnSync } from "node:child_process";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.join(here, "..", "dist", "cli", "index.js");
 const engineRoot = path.join(here, "..");
+
+// Read mode before dependency bootstrap, including on a clean installation.
+const defaultStateDir = process.platform === "darwin"
+  ? path.join(os.homedir(), "Library", "Application Support", "codex-with-chatgpt")
+  : process.platform === "win32"
+    ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "codex-with-chatgpt")
+    : path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), ".local", "state"), "codex-with-chatgpt");
+let workMode = "codex";
+try {
+  const saved = JSON.parse(readFileSync(path.join(process.env.C2C_STATE_DIR?.trim() || defaultStateDir, "prefs.json"), "utf8"));
+  if (["auto", "chat", "codex"].includes(saved.workMode)) workMode = saved.workMode;
+} catch { /* Fresh installations use native Codex. */ }
+const [command, subcommand] = process.argv.slice(2);
+const connectionCommand = ["setup", "start", "restart", "serve", "pair", "wait-auth"].includes(command)
+  || (command === "doctor" && !process.argv.includes("--no-fix"))
+  || (command === "browser" && ["start", "ask", "prompt", "connector"].includes(subcommand))
+  || (command === "tunnel" && ["choose", "login"].includes(subcommand));
+if (workMode === "codex" && connectionCommand && !process.argv.includes("--help")) {
+  const result = { ok: false, code: "CODEX_MODE_ACTIVE", mode: "codex", message: "ChatGPT connection actions are disabled in Codex mode. Change the saved work mode explicitly before connecting." };
+  process.stdout.write((process.argv.includes("--json") ? JSON.stringify(result) : result.message) + "\n");
+  process.exit(1);
+}
+
 
 function runtimeReady() {
   return existsSync(path.join(engineRoot, "node_modules", "commander"));

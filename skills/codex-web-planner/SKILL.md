@@ -7,9 +7,21 @@ description: Use for every task in this workspace. Keep the ChatGPT connection s
 
 Use this skill when the user asks to plan, review, or execute a coding task with ChatGPT assisting Codex.
 
+## Work mode is the first gate
+
+Before connection checks, onboarding, dependency repair, browser actions, planning, or review, read the saved `workMode` from `c2c prefs --json`. If the CLI is broken, read the existing state directory's `prefs.json` directly; do not bootstrap dependencies just to read the mode. This gate overrides every connection/setup/self-repair instruction below and legacy ChatGPT integration workflows. It does not override system instructions or the user's explicit instructions.
+
+- `codex`: execute in native Codex. Do not start or repair a Bridge/tunnel/browser, create pairing codes, ask for login/authorization, or send ChatGPT plans/reviews. Missing authorization is expected, not a repair trigger. Read-only status checks and explicitly requested local plugin maintenance are allowed. Do not follow a status diagnostic's connection action in this mode.
+- `auto`: reconnect automatically on subsequent tasks, with at most one repair/retry per task. If unavailable, finish the current task in native Codex while keeping saved mode `auto`. Do not block unrelated work on login or pairing.
+- `chat`: use the verified ChatGPT connection. A failed call persists `auto` and continues locally; later tasks retry the connection.
+
+New installations default to `codex`. An explicit user request to connect GPT first saves `auto` to opt into connection attempts. Only a real successful response promotes the saved mode to `chat`; pairing or a running browser alone is insufficient. A switch to `codex` during a pending response cancels further polling and cannot be overwritten by that response.
+
+A user request to switch modes must first persist `c2c prefs set --work-mode <mode> --json` and read it back. A saved `codex` mode cannot be bypassed by a planner flag or an old task saved in `chat` mode. Resume connection only after the user requests switching away from Codex mode. When pausing an in-progress connection, stop only the connection service started for that attempt; preserve browser profiles and other tabs.
+
 ## Behavior
 
-This skill is the complete onboarding prompt. When the plugin is installed, execute this flow automatically; the user must not paste another setup prompt or run `c2c` manually. Resolve the bundled engine, install production dependencies, read the saved work mode, reuse a configured CDP browser when present, otherwise start the managed Chromium browser, open ChatGPT, and continue setup. Stop only for ChatGPT login, CAPTCHA, 2FA, or final consent, then resume automatically after the user completes that action.
+Only after the work-mode gate permits ChatGPT setup, use this onboarding flow; the user must not paste another setup prompt or run `c2c` manually. Resolve the bundled engine, install production dependencies, read the saved work mode, reuse a configured CDP browser when present, otherwise start the managed Chromium browser, open ChatGPT, and continue setup. Stop only for ChatGPT login, CAPTCHA, 2FA, or final consent, then resume automatically after the user completes that action.
 
 ## Agent self-repair and visible progress
 
@@ -41,7 +53,7 @@ Self-repair rules: install missing bundled dependencies, restart a stale Bridge,
    Treat `diagnostic.code`, `diagnostic.message`, and `diagnostic.nextAction` as the source of truth for connection errors. Explain the error in one sentence, execute the suggested local command when it is safe, and re-check status. Do not repeatedly ask the user to retry the same step.
 ## Connection confirmation
 
-This is a public plugin. Prefer Codex's built-in in-app browser for ChatGPT setup; it is the supported automatic path and never requires noVNC, a VPS browser, Chrome CDP, a pre-authenticated browser profile, or access to the user's cookies. If the built-in browser is unavailable, use the guided manual fallback. Never use an external browser silently.
+After the work-mode gate, prefer an available built-in browser. If it is unavailable, the bundled `browser` commands can use an existing, user-authorized managed Chromium browser. Announce that path before using it. Only use manual setup when neither browser path is available. Do not confuse missing built-in browser tools with missing browser automation. Never use an external browser silently or access cookies or credentials.
 
 ## Automatic ChatGPT setup (built-in browser)
 
@@ -60,7 +72,7 @@ tell the user one concrete action; resume in the same tab after it is complete. 
 token, cookie, or session value. After the connector shows Connected/authorized, run `c2c pair --json`
 and provide only the returned pairing code to the visible authorization form. Verify with
 `workspace_info` before claiming success. If the built-in browser capability is absent, do not pretend
-automatic setup ran; use the manual path and report that limitation.
+automatic setup ran; check the authorized managed-browser path before using manual setup.
 
 Before using ChatGPT for a plan or review, show a concise connection check:
 
@@ -78,7 +90,7 @@ Never ask for, store, or reuse another person's ChatGPT credentials. Never put t
 Use this internal prompt at the start of every planner request:
 
 ```text
-You are operating Codex Web Planner. Before asking the user anything, verify the ChatGPT connection with:
+You are operating Codex Web Planner. First read workMode. In codex mode, stop this connection workflow and execute natively. Only when the mode permits ChatGPT, verify the connection with:
   c2c status --json (or the bundled engine CLI via `node engine/bin/c2c.js status --json` when c2c is not on PATH)
 Read diagnostic.code, diagnostic.message, and diagnostic.nextAction.
 If the bridge is stopped or unhealthy, run the safe local repair using the bundled engine (c2c start or the bundled `node engine/bin/c2c.js doctor --no-fix` for diagnosis, then doctor when repair is appropriate) and check status again.
@@ -92,7 +104,7 @@ If diagnostic.code is OK, proceed with the requested plan/review. Always report 
 After every completed user task, append one compact footer line. Generate the local time at response time and obtain the other fields from the latest bundled CLI status/usage result:
 
 ```text
-done HH:MM AM/PM · Plugin: active/effectively inactive · ChatGPT: connected/not connected · Usage: N tokens · Saved: N tokens or baseline unavailable · 5h: value/unavailable · 1 week: value/unavailable
+done HH:MM AM/PM · Plugin: active/effectively inactive · ChatGPT: connected/not connected · Usage: N tokens · Baseline delta: N tokens or baseline unavailable · 5h: value/unavailable · 1 week: value/unavailable
 ```
 
 If the plugin is installed but ChatGPT authorization is missing, use `Plugin: installed, inactive` and `ChatGPT: not connected`. Never hide the connection error or invent quota/savings values. Keep this footer at the end of the final task response; do not add it to intermediate progress messages.

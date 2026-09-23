@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { readUiPrefs, recordChatOutcome } from "../config/ui-prefs.js";
 import path from "node:path";
 import { askChatGpt, startBrowser } from "../browser/supervisor.js";
 import { getStateDir, readJsonIfExists, writeSecureJson, ensureDir } from "../config/paths.js";
@@ -23,7 +24,9 @@ function parsePlan(text) {
         return null;
     }
 }
-export async function startPlanning(goal, timeoutMs = 120_000, mode = "auto", onWait) {
+export async function startPlanning(goal, timeoutMs = 120_000, mode = readUiPrefs().workMode, onWait) {
+    if (readUiPrefs().workMode === "codex")
+        mode = "codex";
     const task = { taskId: crypto.randomUUID(), goal, mode, phase: mode === "codex" ? "executing" : "planning", updatedAt: new Date().toISOString() };
     saveTask(task);
     if (mode === "codex")
@@ -36,7 +39,7 @@ export async function startPlanning(goal, timeoutMs = 120_000, mode = "auto", on
     catch (error) {
         result = { ok: false, code: "CHATGPT_BROWSER_ERROR", message: error instanceof Error ? error.message : String(error) };
     }
-    if (!result.ok && mode === "auto") {
+    if (!result.ok && mode === "auto" && readUiPrefs().workMode !== "codex") {
         try {
             await startBrowser();
             result = await askChatGpt(`Retry planning for task ${task.taskId}. Goal: ${goal}. Return only the required JSON plan schema.`, 9222, timeoutMs, onWait);
@@ -45,29 +48,40 @@ export async function startPlanning(goal, timeoutMs = 120_000, mode = "auto", on
             result = { ok: false, code: "CHATGPT_BROWSER_ERROR", message: error instanceof Error ? error.message : String(error) };
         }
     }
-    if (!result.ok) {
-        if (mode === "auto")
-            return { task: saveTask({ ...task, phase: "executing", mode: "codex", fallbackReason: `${result.code}: ${result.message}`, updatedAt: new Date().toISOString() }), ok: true, code: "FALLBACK_CODEX", message: `ChatGPT unavailable; automatically switched to native Codex execution (${result.code}).` };
-        return { task: saveTask({ ...task, phase: "blocked", updatedAt: new Date().toISOString() }), ...result };
+    if (!result.ok || readUiPrefs().workMode === "codex") {
+        recordChatOutcome(false);
+        return { task: saveTask({ ...task, phase: "executing", mode: "codex", fallbackReason: `${result.code}: ${result.message}`, updatedAt: new Date().toISOString() }), ok: true, code: "FALLBACK_CODEX", message: "ChatGPT unavailable; continuing in Codex. Auto mode retries on subsequent tasks unless the user selected Codex." };
     }
     const parsed = parsePlan(result.response ?? "");
-    if (!parsed)
-        return { task: saveTask({ ...task, phase: "blocked", plan: result.response, updatedAt: new Date().toISOString() }), ok: false, code: "PLAN_PARSE_FAILED", message: "ChatGPT returned a response that does not match the required plan schema." };
-    const next = saveTask({ ...task, phase: "executing", plan: result.response, ...parsed, updatedAt: new Date().toISOString() });
+    if (!parsed) {
+        recordChatOutcome(false);
+        return { task: saveTask({ ...task, phase: "executing", mode: "codex", fallbackReason: "PLAN_PARSE_FAILED", updatedAt: new Date().toISOString() }), ok: true, code: "FALLBACK_CODEX", message: "Invalid ChatGPT plan; continuing locally in Auto mode." };
+    }
+    recordChatOutcome(true);
+    const next = saveTask({ ...task, mode: "chat", phase: "executing", plan: result.response, ...parsed, updatedAt: new Date().toISOString() });
     return { task: next, ok: true, code: result.code, message: result.message };
 }
 export async function reviewExecution(resultText, timeoutMs = 120_000) {
     const current = readTask();
     if (!current)
         return { task: null, ok: false, code: "TASK_NOT_FOUND", message: "No planner task is active." };
-    const reviewing = saveTask({ ...current, phase: "reviewing", updatedAt: new Date().toISOString() });
+    const reviewing = saveTask({ ...current, mode: readUiPrefs().workMode === "codex" ? "codex" : current.mode, phase: "reviewing", updatedAt: new Date().toISOString() });
     if (reviewing.mode === "codex")
         return { task: saveTask({ ...reviewing, phase: "done", review: "Skipped: native Codex mode", updatedAt: new Date().toISOString() }), ok: true, code: "CODEX_NATIVE_REVIEW_SKIPPED", message: "Native Codex mode completed without ChatGPT review." };
-    const result = await askChatGpt(`Review Codex execution for task ${reviewing.taskId}.\nOriginal goal: ${reviewing.goal}\nPlan: ${reviewing.plan ?? "(missing)"}\nExecution result:\n${resultText}\nReturn PASS or FIXES with concise evidence. Do not edit files.`, 9222, timeoutMs);
-    if (!result.ok && reviewing.mode === "auto")
-        return { task: saveTask({ ...reviewing, phase: "done", fallbackReason: `${result.code}: ${result.message}`, review: "ChatGPT review unavailable; accepted native Codex completion.", updatedAt: new Date().toISOString() }), ok: true, code: "REVIEW_FALLBACK_CODEX", message: "ChatGPT review unavailable; task completed in native Codex fallback mode." };
-    const done = result.ok && /^\s*PASS\b/i.test(result.response ?? "");
-    const task = saveTask({ ...reviewing, phase: done ? "done" : result.ok ? "executing" : "blocked", review: result.response, updatedAt: new Date().toISOString() });
+    let result;
+    try {
+        result = await askChatGpt(`Review Codex execution for task ${reviewing.taskId}.\nOriginal goal: ${reviewing.goal}\nPlan: ${reviewing.plan ?? "(missing)"}\nExecution result:\n${resultText}\nReturn PASS or FIXES with concise evidence. Do not edit files.`, 9222, timeoutMs);
+    }
+    catch (error) {
+        result = { ok: false, code: "CHATGPT_BROWSER_ERROR", message: error instanceof Error ? error.message : String(error) };
+    }
+    if (!result.ok || readUiPrefs().workMode === "codex") {
+        recordChatOutcome(false);
+        return { task: saveTask({ ...reviewing, mode: "codex", phase: "executing", fallbackReason: `${result.code}: ${result.message}`, review: "ChatGPT review unavailable; finish verification in native Codex.", updatedAt: new Date().toISOString() }), ok: true, code: "REVIEW_FALLBACK_CODEX", message: "Continue verification in Codex; no ChatGPT review passed." };
+    }
+    recordChatOutcome(true);
+    const done = /^\s*PASS\b/i.test(result.response ?? "");
+    const task = saveTask({ ...reviewing, mode: "chat", phase: done ? "done" : "executing", review: result.response, updatedAt: new Date().toISOString() });
     return { task, ok: result.ok, code: result.code, message: result.message };
 }
 export function plannerStatus() { return readTask(); }

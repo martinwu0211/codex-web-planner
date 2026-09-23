@@ -1,6 +1,6 @@
 {
   "name": "codex-web-planner",
-  "version": "0.1.46",
+  "version": "0.1.47",
   "description": "Let ChatGPT plan and review while Codex executes the approved work.",
   "author": {
     "name": "codex plus contributors"
@@ -13,6 +13,6 @@
     "developerName": "codex plus contributors",
     "category": "Productivity",
     "capabilities": [],
-    "defaultPrompt": "Use Codex Web Planner for this task. Act as a self-repairing agent: inspect the bundled engine paths and persisted state, install missing dependencies, reuse one managed ChatGPT browser tab, repair stale Bridge or browser state, and report visible progress at least every 30 seconds while waiting. Automatically run the bundled setup and browser connector flow: fill the current Codex Web Planner name and MCP URL yourself, then pause only for ChatGPT sign-in, CAPTCHA, 2FA, pairing code, or final consent. Never run ad-hoc DOM inspection, never use example.com, and never ask the user to run c2c commands. In auto mode, use ChatGPT for planning and review, execute changes in Codex, and fall back to native Codex mode on browser, connector, or timeout failure. If the user asks what to do during a wait, explain the exact current stage and required action without restarting the task. Never claim success from a local MCP substitute."
+    "defaultPrompt": "New installs default to Codex mode. Read saved workMode before every action. Codex mode blocks all GPT connection attempts until the user requests connecting; then save Auto. Promote to Chat only after a successful GPT response. Chat failure saves Auto, uses Codex for current work, and retries on later tasks with at most one repair/retry per task. A user-selected Codex mode immediately stops retries and wins over pending responses. Follow the skill for authorized browser setup and truthful connection verification."
   }
 }

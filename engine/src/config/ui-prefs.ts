@@ -66,7 +66,7 @@ export function readUiPrefs(): UiPrefsView {
   const stored = readStored();
   const developerModeEnabled = stored?.developerModeEnabled === true;
   const setupMode = stored?.setupMode ?? null;
-  const workMode = stored?.workMode ?? "auto";
+  const workMode = stored?.workMode ?? "codex";
   return {
     developerModeEnabled,
     tokenMetricsEnabled: stored?.tokenMetricsEnabled !== false,
@@ -91,6 +91,9 @@ export function mergeUiPrefs(patch: UiPrefsPatch): UiPrefsView {
   if (patch.setupMode !== undefined && !SETUP_MODES.includes(patch.setupMode)) {
     throw new Error(`setup-mode must be one of ${SETUP_MODES.join(", ")}`);
   }
+  if (patch.workMode !== undefined && !WORK_MODES.includes(patch.workMode)) {
+    throw new Error(`work-mode must be one of ${WORK_MODES.join(", ")}`);
+  }
   const previous = readStored();
   const setupMode = patch.setupMode ?? previous?.setupMode;
   const workMode = patch.workMode ?? previous?.workMode;
@@ -108,4 +111,10 @@ export function mergeUiPrefs(patch: UiPrefsPatch): UiPrefsView {
   if (workMode) stored.workMode = workMode;
   writeSecureJson(prefsFile(), stored);
   return readUiPrefs();
+}
+
+/** A user-selected Codex mode always wins over an in-flight result. */
+export function recordChatOutcome(success: boolean): WorkMode {
+  if (readUiPrefs().workMode === "codex") return "codex";
+  return mergeUiPrefs({ workMode: success ? "chat" : "auto" }).workMode;
 }

@@ -21,7 +21,10 @@ describe("readCodexUsage", () => {
     const dir = path.join(root, "sessions", "2026", "09", "21");
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, `rollout-2026-09-21T00-00-00-${thread}.jsonl`), [
-      JSON.stringify({ payload: { usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120 } }, type: "token_usage_record" }),
+      JSON.stringify({ payload: {
+        usage: { input_tokens: 7, output_tokens: 2, total_tokens: 9 },
+        thread_token_usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120 },
+      }, type: "token_usage_record" }),
       JSON.stringify({ payload: { rate_limits: { primary: { window_minutes: 300, used_percent: 36 }, secondary: { window_minutes: 10080, used_percent: 18 } } } }),
     ].join("\n"));
     process.env.CODEX_HOME = root;
